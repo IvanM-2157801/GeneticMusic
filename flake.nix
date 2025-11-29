@@ -28,6 +28,7 @@
             pkg-config
             gcc
             stdenv.cc.cc.lib
+            qjackctl
           ] ++
             (with pkgs.python311Packages; [
               pip

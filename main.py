@@ -1,7 +1,10 @@
-import asyncio
+import platform
+import subprocess
+import time
+
 import supriya
 from supriya import Envelope, synthdef
-from supriya.ugens import EnvGen, Line, Out, SinOsc
+from supriya.ugens import EnvGen, Out, SinOsc
 
 BPM = 128
 BARS = 8
@@ -20,30 +23,39 @@ def simple_sine(frequency=500, amplitude=0.1, duration=1.0):
     Out.ar(bus=0, source=[sine * envelope] * 2)
 
 
-async def main():
-    # Use non-realtime rendering to generate audio file
-    score = supriya.Score()
+def main():
+    # Boot realtime server
+    server = supriya.Server().boot()
+    server.add_synthdefs(simple_sine)
+    server.sync()
     
-    with score.at(0):
-        score.add_synthdefs(simple_sine)
-        score.add_synth(simple_sine, frequency=440, amplitude=0.1, duration=1.0)  # A4
+    # Auto-connect SuperCollider to default audio output (Linux/PipeWire only)
+    if platform.system() == "Linux":
+        time.sleep(0.5)
+        default_sink = subprocess.run(
+            ['pactl', 'get-default-sink'],
+            capture_output=True, text=True
+        ).stdout.strip()
+        subprocess.run(['pw-link', 'SuperCollider:out_1', f'{default_sink}:playback_FL'], stderr=subprocess.DEVNULL)
+        subprocess.run(['pw-link', 'SuperCollider:out_2', f'{default_sink}:playback_FR'], stderr=subprocess.DEVNULL)
     
-    with score.at(1):
-        score.add_synth(simple_sine, frequency=550, amplitude=0.1, duration=1.0)  # C#5
+    print("Playing 3 notes...")
     
-    with score.at(2):
-        score.add_synth(simple_sine, frequency=660, amplitude=0.1, duration=1.0)  # E5
+    # Play note 1: A4
+    server.add_synth(simple_sine, frequency=440, amplitude=0.1, duration=1.0)
+    time.sleep(1.0)
     
-    # Render to audio file
-    output_path = await score.render(
-        output_file_path="output.wav",
-        duration=4.0,
-        sample_rate=44100,
-    )
+    # Play note 2: C#5
+    server.add_synth(simple_sine, frequency=550, amplitude=0.1, duration=1.0)
+    time.sleep(1.0)
     
-    print(f"Audio rendered to: {output_path}")
-    print("Play with: aplay output.wav (or any audio player)")
+    # Play note 3: E5
+    server.add_synth(simple_sine, frequency=660, amplitude=0.1, duration=1.0)
+    time.sleep(1.0)
+    
+    print("Done!")
+    server.quit()
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
