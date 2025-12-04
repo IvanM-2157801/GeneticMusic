@@ -21,7 +21,6 @@
           
           commonPackages = with pkgs; [
             python311
-            portaudio
             libsndfile
             pkg-config
           ] ++ (with pkgs.python311Packages; [
@@ -33,7 +32,6 @@
             gcc
             stdenv.cc.cc.lib
             pipewire
-            supercollider
           ];
           
           darwinPackages = with pkgs; [
