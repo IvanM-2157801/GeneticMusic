@@ -68,16 +68,19 @@ class LayeredComposer:
         elitism_count: int = 6,
         rhythm_generations: int = 20,
         melody_generations: int = 30,
+        use_context: bool = True,  # Enable inter-layer dependencies
     ):
         self.population_size = population_size
         self.mutation_rate = mutation_rate
         self.elitism_count = elitism_count
         self.rhythm_generations = rhythm_generations
         self.melody_generations = melody_generations
+        self.use_context = use_context
 
         self.layer_configs: list[LayerConfig] = []
         self.evolved_rhythms: dict[str, str] = {}  # layer_name -> rhythm string
         self.evolved_phrases: dict[str, Phrase] = {}  # layer_name -> Phrase
+        self.evolved_layers: dict[str, tuple[Layer, str]] = {}  # layer_name -> (Layer, rhythm)
 
     def add_layer(self, config: LayerConfig) -> None:
         """Add a layer configuration."""
@@ -154,12 +157,25 @@ class LayeredComposer:
             for _ in range(self.population_size)
         ]
 
-        # Evolve
+        # Evolve with contextual fitness
+        from fitness.contextual import create_contextual_fitness
+
+        # Create contextual fitness that considers already-evolved layers
+        contextual_fitness = create_contextual_fitness(
+            intrinsic_fitness=config.melody_fitness_fn,
+            evolved_layers=self.evolved_layers,
+            use_context=self.use_context,
+        )
+
         def melody_fitness(phrase: Phrase) -> float:
             layer = Layer(
-                name=config.name, phrases=[phrase], instrument=config.instrument
+                name=config.name,
+                phrases=[phrase],
+                instrument=config.instrument,
+                rhythm=rhythm,
+                is_drum=config.is_drum,
             )
-            return config.melody_fitness_fn.evaluate(layer)
+            return contextual_fitness.evaluate(layer)
 
         def melody_mutate(phrase: Phrase) -> Phrase:
             mutated = mutate_phrase(phrase, mutation_rate=self.mutation_rate)
@@ -191,7 +207,7 @@ class LayeredComposer:
         return best_phrase
 
     def evolve_all_layers(self, verbose: bool = True) -> None:
-        """Evolve all layers (rhythm then melody for each)."""
+        """Evolve all layers (rhythm then melody for each) with inter-layer dependencies."""
         for config in self.layer_configs:
             # Phase 1: Evolve rhythm
             rhythm = self.evolve_layer_rhythm(config, verbose=verbose)
@@ -203,9 +219,28 @@ class LayeredComposer:
                 if verbose:
                     print(f"✓ Drum layer '{config.name}' complete (rhythm only)\n")
                 self.evolved_phrases[config.name] = None
+
+                # Add drum layer to context for future layers
+                drum_layer = Layer(
+                    name=config.name,
+                    instrument=config.instrument,
+                    rhythm=rhythm,
+                    is_drum=True,
+                    drum_sound=config.drum_sound,
+                )
+                self.evolved_layers[config.name] = (drum_layer, rhythm)
             else:
                 phrase = self.evolve_layer_melody(config, rhythm, verbose=verbose)
                 self.evolved_phrases[config.name] = phrase
+
+                # Add melodic layer to context for future layers
+                melodic_layer = Layer(
+                    name=config.name,
+                    phrases=[phrase],
+                    instrument=config.instrument,
+                    rhythm=rhythm,
+                )
+                self.evolved_layers[config.name] = (melodic_layer, rhythm)
 
     def get_composition(self, bpm: int = 120, random_scale: bool = True) -> Composition:
         """Get the final composition with all evolved layers.

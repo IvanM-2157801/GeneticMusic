@@ -176,10 +176,115 @@ def percussion_pattern_fitness(rhythm: str) -> float:
     )
 
 
+def rock_kick_fitness(rhythm: str) -> float:
+    """Rock kick drum: Strong on 1 and 3, powerful and consistent."""
+    from fitness.rhythm import rhythm_consistency, rhythm_density
+
+    # Emphasize beats 1, 3, 5, 7 (downbeats)
+    downbeat_score = 0
+    for i in [0, 2, 4, 6]:
+        if i < len(rhythm) and int(rhythm[i]) >= 1:
+            downbeat_score += 1
+    downbeat_score = downbeat_score / 4.0 if len(rhythm) >= 8 else downbeat_score / 2.0
+
+    # Moderate density (not too sparse, not too busy)
+    density = rhythm_density(rhythm)
+    target_density = 0.2  # About 20% density
+    density_score = 1.0 - abs(density - target_density) / max(target_density, 0.1)
+
+    return (
+        0.50 * downbeat_score +  # Strong downbeats
+        0.30 * density_score +  # Moderate density
+        0.20 * rhythm_consistency(rhythm)  # Consistent pattern
+    )
+
+
+def metal_kick_fitness(rhythm: str) -> float:
+    """Metal kick drum: Fast double bass, high density, aggressive."""
+    from fitness.rhythm import rhythm_density, rhythm_complexity
+
+    # Count fast hits (3s and 4s = triplets and sixteenths)
+    fast_hits = sum(1 for c in rhythm if int(c) >= 3)
+    fast_score = min(fast_hits / len(rhythm), 1.0) if rhythm else 0.0
+
+    # High density
+    density = rhythm_density(rhythm)
+    density_score = min(density / 0.4, 1.0)  # Target 40%+ density
+
+    return (
+        0.50 * fast_score +  # Fast double bass patterns
+        0.35 * density_score +  # High density
+        0.15 * rhythm_complexity(rhythm)  # Complex patterns
+    )
+
+
+def jazz_kick_fitness(rhythm: str) -> float:
+    """Jazz kick drum: Syncopated, dynamic, conversational."""
+    from fitness.rhythm import rhythm_syncopation, rhythm_complexity, rhythm_density
+
+    # Jazz kick is all about syncopation and variety
+    density = rhythm_density(rhythm)
+    target_density = 0.15  # Sparse but present
+    density_score = 1.0 - abs(density - target_density) / 0.3
+
+    return (
+        0.40 * rhythm_syncopation(rhythm) +  # Highly syncopated
+        0.35 * rhythm_complexity(rhythm) +  # Varied patterns
+        0.25 * density_score  # Moderate-low density
+    )
+
+
+def electronic_kick_fitness(rhythm: str) -> float:
+    """Electronic kick drum: Four-on-the-floor or quantized patterns."""
+    from fitness.rhythm import rhythm_consistency, rhythm_density
+
+    # Check for four-on-the-floor pattern (every beat)
+    all_beats = sum(1 for c in rhythm if int(c) >= 1)
+    four_on_floor_score = all_beats / len(rhythm) if rhythm else 0.0
+
+    # Very consistent
+    consistency = rhythm_consistency(rhythm)
+
+    return (
+        0.50 * four_on_floor_score +  # Every beat or regular pattern
+        0.35 * consistency +  # Very consistent
+        0.15 * rhythm_density(rhythm)  # Moderate density
+    )
+
+
+# Genre-specific complete drum kits
+DRUM_GENRE_FUNCTIONS = {
+    "rock": {
+        "kick": rock_kick_fitness,
+        "hihat": hihat_pattern_fitness,
+        "snare": snare_pattern_fitness,
+    },
+    "metal": {
+        "kick": metal_kick_fitness,
+        "hihat": hihat_pattern_fitness,  # Fast, steady
+        "snare": snare_pattern_fitness,
+    },
+    "jazz": {
+        "kick": jazz_kick_fitness,
+        "hihat": percussion_pattern_fitness,  # Varied, textural
+        "snare": percussion_pattern_fitness,  # Light, varied
+    },
+    "electronic": {
+        "kick": electronic_kick_fitness,
+        "hihat": hihat_pattern_fitness,
+        "snare": snare_pattern_fitness,
+    },
+}
+
 # Registry for drum-specific fitness functions
 DRUM_FITNESS_FUNCTIONS = {
     "kick": kick_pattern_fitness,
     "hihat": hihat_pattern_fitness,
     "snare": snare_pattern_fitness,
     "percussion": percussion_pattern_fitness,
+    # Genre-specific variants
+    "rock_kick": rock_kick_fitness,
+    "metal_kick": metal_kick_fitness,
+    "jazz_kick": jazz_kick_fitness,
+    "electronic_kick": electronic_kick_fitness,
 }

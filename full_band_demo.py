@@ -21,8 +21,8 @@ def main():
     print()
 
     composer = LayeredComposer(
-        population_size=200,
-        mutation_rate=0.50,
+        population_size=100,
+        mutation_rate=0.25,
         elitism_count=6,
         rhythm_generations=25,
         melody_generations=30,
