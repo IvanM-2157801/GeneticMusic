@@ -18,3 +18,18 @@ from .genres import (
     AmbientFitness,
     FITNESS_FUNCTIONS,
 )
+from .rhythm import (
+    rhythm_complexity,
+    rhythm_rest_ratio,
+    rhythm_density,
+    rhythm_syncopation,
+    rhythm_groove,
+    rhythm_consistency,
+    rhythm_offbeat_emphasis,
+    pop_rhythm_fitness,
+    jazz_rhythm_fitness,
+    funk_rhythm_fitness,
+    ambient_rhythm_fitness,
+    rock_rhythm_fitness,
+    RHYTHM_FITNESS_FUNCTIONS,
+)
