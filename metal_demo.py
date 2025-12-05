@@ -1,9 +1,17 @@
 """Heavy metal demo with distorted guitars, power chords, and aggressive drums."""
+
 import base64
 from layered_composer import LayeredComposer, LayerConfig
 from fitness.rhythm import RHYTHM_FITNESS_FUNCTIONS
 from fitness.drums import DRUM_FITNESS_FUNCTIONS
-from fitness.melody_types import MelodicFitness, ChordFitness
+
+# NEW: Importing the improved fitness classes
+from fitness.melody_types import (
+    MelodicFitness,
+    ChordFitness,
+    LeadArcFitness,  # For the guitar solo
+    RhythmicMotifFitness,  # For the driving bassline
+)
 from core.music import NoteName
 
 
@@ -13,17 +21,17 @@ def main():
     print("=" * 60)
     print("\nGenerating metal composition with:")
     print("  🎸 Rhythm Guitar - Heavy power chords")
-    print("  🎸 Lead Guitar - Fast aggressive riffs")
-    print("  🎸 Bass - Deep, following rhythm")
+    print("  🎸 Lead Guitar - Shredding solo with 'Arc' structure")
+    print("  🎸 Bass - Rhythmic motif locking with drums")
     print("  🥁 Drums - Double bass, aggressive snare")
     print()
 
     composer = LayeredComposer(
-        population_size=30,
+        population_size=40,  # Increased for better convergence on complex functions
         mutation_rate=0.3,
         elitism_count=8,
         rhythm_generations=30,
-        melody_generations=35,
+        melody_generations=40,
     )
 
     # Use minor scale for that dark metal sound
@@ -50,7 +58,7 @@ def main():
             octave_range=(2, 3),  # Low tuning
             scale=e_minor,
             rhythm_fitness_fn=RHYTHM_FITNESS_FUNCTIONS["funk"],  # Syncopated, groovy
-            melody_fitness_fn=ChordFitness(),  # Power chord intervals
+            melody_fitness_fn=ChordFitness(),  # Power chord intervals (5ths)
             strudel_scale="",
             octave_shift=-12,  # Very low, heavy
             gain=0.6,
@@ -61,7 +69,8 @@ def main():
     )
 
     # 2. LEAD GUITAR - Fast, melodic riffs
-    print("Adding lead guitar...")
+    # CHANGED: Using LeadArcFitness to create a "Story" solo
+    print("Adding lead guitar (Solo Arc)...")
     composer.add_layer(
         LayerConfig(
             name="lead_guitar",
@@ -72,18 +81,20 @@ def main():
             octave_range=(4, 6),  # Higher register
             scale=e_minor,
             rhythm_fitness_fn=RHYTHM_FITNESS_FUNCTIONS["funk"],
-            melody_fitness_fn=MelodicFitness(),  # Wide intervals, expressive
+            # NEW: LeadArcFitness ensures the solo rises and resolves home to E
+            melody_fitness_fn=LeadArcFitness(),
             strudel_scale="",
             octave_shift=0,
-            gain=0.4,
-            lpf=3000,  # Brighter, cutting through
+            gain=0.45,
+            lpf=3500,  # Brighter, cutting through
             use_scale_degrees=True,
             chord_mode=False,
         )
     )
 
     # 3. BASS - Deep, following rhythm
-    print("Adding bass...")
+    # CHANGED: Using RhythmicMotifFitness to lock in the groove
+    print("Adding bass (Rhythmic Motif)...")
     composer.add_layer(
         LayerConfig(
             name="bass",
@@ -94,7 +105,8 @@ def main():
             octave_range=(1, 2),  # Very low
             scale=e_minor,
             rhythm_fitness_fn=RHYTHM_FITNESS_FUNCTIONS["bass"],
-            melody_fitness_fn=ChordFitness(),  # Follow root notes
+            # NEW: RhythmicMotifFitness prioritizes repetitive, syncopated hooks
+            melody_fitness_fn=RhythmicMotifFitness(),
             strudel_scale="",
             octave_shift=-24,  # Extremely low
             gain=0.7,
@@ -115,7 +127,9 @@ def main():
             bars=1,
             beats_per_bar=8,
             max_subdivision=4,  # Allow fast double bass (16th notes)
-            rhythm_fitness_fn=DRUM_FITNESS_FUNCTIONS["hihat"],  # Use hihat fitness for high density
+            rhythm_fitness_fn=DRUM_FITNESS_FUNCTIONS[
+                "hihat"
+            ],  # Use hihat fitness for high density
             is_drum=True,
             drum_sound="bd",
             gain=0.9,  # Loud and powerful
@@ -211,21 +225,16 @@ def main():
     print("\nMetal characteristics:")
     print("  🎸 RHYTHM GUITAR:")
     print("      - Power chords with chord_mode (root + fifth)")
-    print("      - .sub(-12) for drop tuning heaviness")
     print("      - lpf(800) for chunky, palm-muted tone")
     print("  🎸 LEAD GUITAR:")
-    print("      - Fast melodic runs with square wave")
-    print("      - lpf(3000) for cutting, aggressive tone")
-    print("      - MelodicFitness for wide interval jumps")
+    print("      - USES 'LeadArcFitness': Rewards smooth contours and tonic resolution")
+    print("      - Attempts to tell a melodic story rather than random shredding")
     print("  🎸 BASS:")
-    print("      - .sub(-24) for extremely low rumble")
-    print("      - lpf(500) for deep, tight sound")
-    print("      - Follows rhythm guitar patterns")
+    print("      - USES 'RhythmicMotifFitness': Rewards repetition and syncopation")
+    print("      - Locks into a groove pattern")
     print("  🥁 DRUMS:")
     print("      - KICK: High density for double bass patterns")
     print("      - SNARE: Strong backbeat emphasis")
-    print("      - HI-HAT: Fast, steady timekeeping")
-    print("      - CRASH: Sparse accents for dynamics")
     print("  ⚡ TEMPO: 160 BPM (thrash/speed metal range)")
     print("  🎼 KEY: E Minor (classic metal tonality)")
     print()
