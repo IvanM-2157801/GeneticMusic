@@ -33,10 +33,10 @@ class PopMelodyFitness(FitnessFunction):
         for phrase in layer.phrases:
             score = (
                 # 0.60 * scale_adherence(phrase, MAJOR_SCALE) +
-                0.40 * interval_smoothness(phrase) +
-                0.20 * note_variety(phrase) +
-                0.15 * self._repetition_bonus(phrase) +
-                0.25 * rest_ratio(phrase)
+                0.60 * interval_smoothness(phrase) +
+                0.15 * note_variety(phrase) +
+                0.25 * self._repetition_bonus(phrase)
+                # 0.10 * rest_ratio(phrase)
             )
             scores.append(score)
         

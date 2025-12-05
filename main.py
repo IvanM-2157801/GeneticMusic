@@ -17,7 +17,7 @@ MAX_SUBDIVISION = 4  # Max notes per beat (1=quarter, 2=eighth, 3=triplet, 4=six
 
 POPULATION_SIZE = 25
 MUTATION_RATE = 0.35
-ELITISM_COUNT = 6
+ELITISM_COUNT = 4
 
 # Genre selection
 GENRE = "pop"  # Options: "pop", "jazz", "blues", "ambient"
@@ -83,7 +83,7 @@ def phrase_to_strudel_notes(phrase: Phrase) -> list[str]:
 def user_fitness_fn(genome, to_strudel_fn) -> float:
     """Get fitness score from user input."""
     notes = to_strudel_fn(genome)
-    strudel.create_strudel(notes, TOTAL_BEATS)
+    strudel.create_strudel(notes, TOTAL_BEATS, BPM)
     
     while True:
         try:
@@ -132,7 +132,7 @@ def evolve_rhythm() -> str:
         
         # Show the rhythm
         notes = rhythm_to_strudel(best.genome)
-        strudel.create_strudel(notes, TOTAL_BEATS)
+        strudel.create_strudel(notes, TOTAL_BEATS, BPM)
         
         if best.fitness >= 0.92:
             print("\n✓ Rhythm selected!")
@@ -194,7 +194,7 @@ def evolve_melody(rhythm: str) -> Phrase:
         # Show the current best melody
         notes = phrase_to_strudel_notes(best.genome)
         print(f"Best melody: {' '.join(notes)}")
-        strudel.create_strudel(notes, TOTAL_BEATS)
+        strudel.create_strudel(notes, TOTAL_BEATS, BPM)
         
         if best.fitness >= 0.95:
             print("\n🎵 Found a satisfying melody!")
@@ -215,7 +215,7 @@ def main():
     print("FINAL RESULT")
     print("="*50)
     notes = phrase_to_strudel_notes(melody)
-    strudel.create_strudel(notes, TOTAL_BEATS)
+    strudel.create_strudel(notes, TOTAL_BEATS, BPM)
 
 
 if __name__ == "__main__":

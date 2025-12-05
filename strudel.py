@@ -1,8 +1,8 @@
 import base64
 
-def create_strudel(notes: list[str], total_notes: int):
+def create_strudel(notes: list[str], total_notes: int, bpm: int):
 	strudel_script = f"""
-setcpm(160/{total_notes})
+setcpm({bpm}/{total_notes})
 
 $: note("{" ".join(notes)}")
 .scale("c:major").gain(0.2).sound("piano")
