@@ -27,6 +27,12 @@ class LayerConfig:
     scale: list[NoteName] = None
     rhythm_fitness_fn: Callable[[str], float] = None  # Takes rhythm string
     melody_fitness_fn: FitnessFunction = None  # Takes Layer object
+    # Strudel parameters
+    strudel_scale: str = ""  # e.g., "c:minor" - if empty, will be set randomly
+    octave_shift: int = 0  # e.g., -7 for .sub(7)
+    gain: float = 0.5
+    lpf: int = 4000
+    use_scale_degrees: bool = True  # Use 0-7 scale degrees
 
     def __post_init__(self):
         if self.scale is None:
@@ -181,16 +187,37 @@ class LayeredComposer:
             phrase = self.evolve_layer_melody(config, rhythm, verbose=verbose)
             self.evolved_phrases[config.name] = phrase
 
-    def get_composition(self, bpm: int = 120) -> Composition:
-        """Get the final composition with all evolved layers."""
+    def get_composition(self, bpm: int = 120, random_scale: bool = True) -> Composition:
+        """Get the final composition with all evolved layers.
+
+        Args:
+            bpm: Beats per minute
+            random_scale: If True, uses a random scale for all layers
+        """
+        # Generate random scale if needed
+        if random_scale:
+            composition_scale = Composition.random_scale()
+        else:
+            composition_scale = "c:major"
+
         layers = []
         for config in self.layer_configs:
             phrase = self.evolved_phrases.get(config.name)
+            rhythm = self.evolved_rhythms.get(config.name)
             if phrase:
+                # Use config scale if specified, otherwise use composition scale
+                layer_scale = config.strudel_scale if config.strudel_scale else composition_scale
+
                 layer = Layer(
                     name=config.name,
                     phrases=[phrase],
-                    instrument=config.instrument
+                    instrument=config.instrument,
+                    rhythm=rhythm if rhythm else "",
+                    scale=layer_scale,
+                    octave_shift=config.octave_shift,
+                    gain=config.gain,
+                    lpf=config.lpf,
+                    use_scale_degrees=config.use_scale_degrees
                 )
                 layers.append(layer)
 

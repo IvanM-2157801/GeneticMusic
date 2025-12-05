@@ -18,6 +18,10 @@ from .genres import (
     AmbientFitness,
     FITNESS_FUNCTIONS,
 )
+from .melody_types import (
+    MelodicFitness,
+    StableFitness,
+)
 from .rhythm import (
     rhythm_complexity,
     rhythm_rest_ratio,
@@ -31,5 +35,7 @@ from .rhythm import (
     funk_rhythm_fitness,
     ambient_rhythm_fitness,
     rock_rhythm_fitness,
+    drum_rhythm_fitness,
+    bass_rhythm_fitness,
     RHYTHM_FITNESS_FUNCTIONS,
 )

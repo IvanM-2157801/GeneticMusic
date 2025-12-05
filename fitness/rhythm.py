@@ -130,12 +130,15 @@ def pop_rhythm_fitness(rhythm: str) -> float:
 
     Example good patterns: "22222222", "21212121", "22112211"
     """
+    # Target density around 0.5 (moderate)
+    density_score = 1.0 - abs(0.5 - rhythm_density(rhythm))
+
     return (
-        0.25 * rhythm_consistency(rhythm) +  # Repetitive/catchy
+        0.35 * rhythm_consistency(rhythm) +  # Very repetitive/catchy
         0.25 * rhythm_groove(rhythm) +  # Strong groove
-        0.25 * (1 - rhythm_rest_ratio(rhythm)) +  # Few rests
-        0.15 * rhythm_density(rhythm) +  # Moderate density
-        0.10 * (1 - rhythm_complexity(rhythm))  # Not too complex
+        0.20 * (1 - rhythm_rest_ratio(rhythm)) +  # Few rests
+        0.15 * density_score +  # Moderate density (not too dense)
+        0.05 * (1 - rhythm_complexity(rhythm))  # Simple patterns
     )
 
 
@@ -150,12 +153,15 @@ def jazz_rhythm_fitness(rhythm: str) -> float:
 
     Example good patterns: "31402310", "24130421", "32142013"
     """
+    # Target moderate rest ratio (10-30%)
+    rest_score = 1.0 - abs(0.2 - rhythm_rest_ratio(rhythm)) / 0.2
+
     return (
-        0.35 * rhythm_syncopation(rhythm) +  # Very syncopated
+        0.30 * rhythm_syncopation(rhythm) +  # Syncopated
         0.25 * rhythm_complexity(rhythm) +  # Complex patterns
         0.20 * rhythm_offbeat_emphasis(rhythm) +  # Offbeat accents
-        0.10 * (0.5 - abs(0.3 - rhythm_rest_ratio(rhythm))) +  # ~30% rests
-        0.10 * (1 - rhythm_consistency(rhythm))  # Avoid repetition
+        0.15 * rest_score +  # Some rests but not too many
+        0.10 * (1 - rhythm_consistency(rhythm))  # Varied, not repetitive
     )
 
 
@@ -170,11 +176,14 @@ def funk_rhythm_fitness(rhythm: str) -> float:
 
     Example good patterns: "42142114", "32143214", "24243214"
     """
+    # Target moderate to high density (0.6-0.8)
+    density_score = 1.0 - abs(0.7 - rhythm_density(rhythm))
+
     return (
         0.40 * rhythm_groove(rhythm) +  # Maximum groove
-        0.30 * rhythm_syncopation(rhythm) +  # Highly syncopated
-        0.15 * rhythm_offbeat_emphasis(rhythm) +  # Offbeat accents
-        0.10 * rhythm_density(rhythm) +  # Fairly dense
+        0.25 * rhythm_syncopation(rhythm) +  # Highly syncopated
+        0.20 * rhythm_offbeat_emphasis(rhythm) +  # Offbeat accents
+        0.10 * density_score +  # Moderate to high density
         0.05 * (1 - rhythm_rest_ratio(rhythm))  # Few rests
     )
 
@@ -210,12 +219,62 @@ def rock_rhythm_fitness(rhythm: str) -> float:
 
     Example good patterns: "22222222", "24242424", "22242224"
     """
+    # Target high density (0.6-0.8)
+    density_score = 1.0 - abs(0.7 - rhythm_density(rhythm))
+
     return (
-        0.30 * rhythm_density(rhythm) +  # Dense/energetic
+        0.30 * density_score +  # High but not extreme density
         0.25 * rhythm_groove(rhythm) +  # Strong groove
         0.20 * (1 - rhythm_rest_ratio(rhythm)) +  # Few rests
         0.15 * rhythm_consistency(rhythm) +  # Consistent patterns
-        0.10 * (0.5 - abs(0.3 - rhythm_complexity(rhythm)))  # Moderate complexity
+        0.10 * (1 - rhythm_complexity(rhythm))  # Not too complex
+    )
+
+
+def drum_rhythm_fitness(rhythm: str) -> float:
+    """Fitness for drum rhythms: steady, driving, simple.
+
+    Characteristics:
+    - Very consistent (steady beat)
+    - High density (constant rhythm)
+    - Simple patterns (not complex)
+    - Strong groove (danceable)
+    - Minimal rests (keep the beat)
+
+    Example good patterns: "22222222", "44444444", "24242424"
+    """
+    # Target high density (0.7-0.9) for drums
+    density_score = 1.0 - abs(0.8 - rhythm_density(rhythm))
+
+    return (
+        0.35 * rhythm_consistency(rhythm) +  # Very consistent beat
+        0.30 * density_score +  # High density
+        0.20 * (1 - rhythm_rest_ratio(rhythm)) +  # Minimal rests
+        0.10 * rhythm_groove(rhythm) +  # Groove
+        0.05 * (1 - rhythm_complexity(rhythm))  # Simple patterns
+    )
+
+
+def bass_rhythm_fitness(rhythm: str) -> float:
+    """Fitness for bass rhythms: solid, groovy, supportive.
+
+    Characteristics:
+    - Simple, repetitive patterns
+    - Moderate density (not too busy)
+    - Strong groove (locks with drums)
+    - Few rests (solid foundation)
+
+    Example good patterns: "21212121", "11112222", "22112211"
+    """
+    # Target moderate density (0.4-0.6)
+    density_score = 1.0 - abs(0.5 - rhythm_density(rhythm))
+
+    return (
+        0.35 * rhythm_consistency(rhythm) +  # Very repetitive
+        0.25 * rhythm_groove(rhythm) +  # Strong groove
+        0.20 * density_score +  # Moderate density
+        0.15 * (1 - rhythm_rest_ratio(rhythm)) +  # Few rests
+        0.05 * (1 - rhythm_complexity(rhythm))  # Simple patterns
     )
 
 
@@ -224,6 +283,8 @@ RHYTHM_FITNESS_FUNCTIONS = {
     "pop": pop_rhythm_fitness,
     "jazz": jazz_rhythm_fitness,
     "funk": funk_rhythm_fitness,
+    "drum": drum_rhythm_fitness,
+    "bass": bass_rhythm_fitness,
     "ambient": ambient_rhythm_fitness,
     "rock": rock_rhythm_fitness,
 }
