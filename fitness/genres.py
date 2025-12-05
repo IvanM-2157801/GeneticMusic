@@ -23,11 +23,11 @@ class PopFitness(FitnessFunction):
         scores = []
         for phrase in layer.phrases:
             score = (
-                0.3 * scale_adherence(phrase, MAJOR_SCALE) +
-                0.2 * interval_smoothness(phrase) +
-                0.2 * (1 - rest_ratio(phrase)) +  # Prefer fewer rests
-                0.15 * self._repetition_bonus(phrase) +
-                0.15 * rhythmic_variety(phrase)
+                0.50 * scale_adherence(phrase, MAJOR_SCALE) +
+                0.25 * interval_smoothness(phrase) +
+                0.12 * (1 - rest_ratio(phrase)) +  # Prefer fewer rests
+                # 0.10 * self._repetition_bonus(phrase) +
+                0.13 * rhythmic_variety(phrase)
             )
             scores.append(score)
         

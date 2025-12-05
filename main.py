@@ -1,7 +1,8 @@
 import strudel
 from core.genetic import GeneticAlgorithm, Individual
-from core.music import Phrase, NoteName
+from core.music import Phrase, NoteName, Layer
 from core.genome_ops import random_phrase, mutate_phrase, crossover_phrase
+from fitness.genres import PopFitness
 
 # Constants
 BPM = 128
@@ -9,10 +10,9 @@ BARS = 2
 BEATS_PER_BAR = 4
 TOTAL_NOTES = BARS * BEATS_PER_BAR
 
-POPULATION_SIZE = 5
-MUTATION_RATE = 0.2
-CROSSOVER_RATE = 0.8
-ELITISM_COUNT = 2
+POPULATION_SIZE = 25
+MUTATION_RATE = 0.25
+ELITISM_COUNT = 6
 
 # Scale to use (C major)
 SCALE = [NoteName.C, NoteName.D, NoteName.E, NoteName.F, NoteName.G, NoteName.A, NoteName.B]
@@ -61,8 +61,7 @@ def generate_initial_population() -> list[Individual[Phrase]]:
         Individual(random_phrase(
             length=TOTAL_NOTES,
             scale=SCALE,
-            octave_range=(4, 5),
-            rest_probability=0.1,
+            octave_range=(4, 5)
         ))
         for _ in range(POPULATION_SIZE)
     ]
@@ -72,7 +71,6 @@ def main():
     ga = GeneticAlgorithm[Phrase](
         population_size=POPULATION_SIZE,
         mutation_rate=MUTATION_RATE,
-        crossover_rate=CROSSOVER_RATE,
         elitism_count=ELITISM_COUNT,
     )
     
@@ -83,10 +81,14 @@ def main():
         print(f"\n=== Generation {generation} ===")
         print(f"Population size: {len(population)}")
         
+        popfit = PopFitness()
+        def pop_fitness_fn(phrase: Phrase) -> float:
+            return popfit.evaluate(Layer(name="melody", phrases=[phrase]))
+        
         # Evolve one generation
         population = ga.evolve(
             population=population,
-            fitness_fn=user_fitness_fn,
+            fitness_fn=pop_fitness_fn,
             mutate_fn=mutate_fn,
             crossover_fn=crossover_fn,
         )
@@ -95,7 +97,7 @@ def main():
         best = population[0]
         print(f"Best fitness: {best.fitness}")
         
-        if best.fitness >= 6:
+        if best.fitness >= 0.97:
             print("\n🎵 Found a satisfying melody!")
             notes = phrase_to_strudel_notes(best.genome)
             strudel.create_strudel(notes, TOTAL_NOTES)

@@ -16,12 +16,10 @@ class GeneticAlgorithm(Generic[T]):
         self,
         population_size: int,
         mutation_rate: float,
-        crossover_rate: float,
         elitism_count: int = 2,
     ):
         self.population_size = population_size
         self.mutation_rate = mutation_rate
-        self.crossover_rate = crossover_rate
         self.elitism_count = elitism_count
 
     def evolve(
@@ -46,11 +44,7 @@ class GeneticAlgorithm(Generic[T]):
             parent1 = self._select(population)
             parent2 = self._select(population)
 
-            # random chance to use combined genome or genome of parent1
-            if random.random() < self.crossover_rate:
-                child_genome = crossover_fn(parent1.genome, parent2.genome)
-            else:
-                child_genome = parent1.genome
+            child_genome = crossover_fn(parent1.genome, parent2.genome)
 
             if random.random() < self.mutation_rate:
                 child_genome = mutate_fn(child_genome)
