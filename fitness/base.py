@@ -1,6 +1,5 @@
-"""Base fitness function interface."""
 from abc import ABC, abstractmethod
-from music_ga.core.music import Layer, Phrase, Note, NoteName
+from core.music import Layer, Phrase, Note, NoteName
 
 
 class FitnessFunction(ABC):

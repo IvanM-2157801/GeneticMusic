@@ -1,4 +1,3 @@
-"""Genre-specific fitness functions."""
 from .base import (
     FitnessFunction,
     note_variety,
@@ -11,7 +10,7 @@ from .base import (
     PENTATONIC,
     BLUES_SCALE,
 )
-from music_ga.core.music import Layer, Phrase, NoteName
+from core.music import Layer, Phrase, NoteName
 
 
 class PopFitness(FitnessFunction):
