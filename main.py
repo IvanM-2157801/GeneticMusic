@@ -52,13 +52,14 @@ def phrase_to_strudel_notes(phrase: Phrase) -> list[str]:
             degree = SCALE.index(note.pitch)
             note_str = str(degree)
         else:
-            note_str = "0"
+            # For notes not in scale, find closest scale degree
+            note_str = str(note.pitch.value % 7)
         
         current_beat_notes.append(note_str)
         current_beat_duration += note.duration
         
         # When we complete a beat, flush the notes
-        if current_beat_duration >= 1.0 - 0.001:  # Small epsilon for float comparison
+        if current_beat_duration >= 0.999:  # Small epsilon for float comparison
             if len(current_beat_notes) == 1:
                 result.append(current_beat_notes[0])
             else:
@@ -153,13 +154,14 @@ def evolve_melody(rhythm: str) -> Phrase:
         for _ in range(POPULATION_SIZE)
     ]
     
+    popfit = PopFitness()
     generation = 0
     
     while True:
         print(f"\n=== Melody Generation {generation} ===")
         
         def melody_fitness(phrase: Phrase) -> float:
-            return user_fitness_fn(phrase, phrase_to_strudel_notes)
+            return popfit.evaluate(Layer(name="melody", phrases=[phrase]))
         
         def melody_mutate(phrase: Phrase) -> Phrase:
             # Mutate the phrase but keep the rhythm
@@ -181,7 +183,12 @@ def evolve_melody(rhythm: str) -> Phrase:
         best = population[0]
         print(f"Best fitness: {best.fitness}")
         
-        if best.fitness >= 6:
+        # Show the current best melody
+        notes = phrase_to_strudel_notes(best.genome)
+        print(f"Best melody: {' '.join(notes)}")
+        strudel.create_strudel(notes, TOTAL_BEATS)
+        
+        if best.fitness >= 0.95:
             print("\n🎵 Found a satisfying melody!")
             return best.genome
         

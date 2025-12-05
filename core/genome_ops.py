@@ -102,8 +102,7 @@ def random_note(
     return Note(
         pitch=random.choice(scale),
         octave=random.randint(*octave_range),
-        duration=random.choice([0.25, 0.5, 1.0, 2.0]),
-        velocity=random.uniform(0.5, 1.0),
+        duration=random.choice([0.25, 0.5, 1.0, 2.0])
     )
 
 
@@ -128,7 +127,7 @@ def random_layer(
 # === Mutation Operations ===
 
 def mutate_note(note: Note, scale: list[NoteName] | None = None) -> Note:
-    mutation_type = random.choice(["pitch", "octave", "duration", "velocity"])
+    mutation_type = random.choice(["pitch", "octave", "duration"])
     new_note = deepcopy(note)
     
     if mutation_type == "pitch":
@@ -141,8 +140,6 @@ def mutate_note(note: Note, scale: list[NoteName] | None = None) -> Note:
         new_note.octave = max(1, min(7, new_note.octave + random.choice([-1, 1])))
     elif mutation_type == "duration":
         new_note.duration = random.choice([0.25, 0.5, 1.0, 2.0])
-    else:
-        new_note.velocity = max(0.1, min(1.0, new_note.velocity + random.uniform(-0.2, 0.2)))
     
     return new_note
 

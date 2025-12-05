@@ -22,7 +22,6 @@ class Note:
     pitch: NoteName
     octave: int = 4
     duration: float = 1.0  # In beats
-    velocity: float = 0.8  # 0.0 - 1.0
 
     @property
     def midi_pitch(self) -> int:
