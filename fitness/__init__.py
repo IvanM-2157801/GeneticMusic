@@ -11,10 +11,4 @@ from .base import (
     PENTATONIC,
     BLUES_SCALE,
 )
-from .genres import (
-    PopFitness,
-    JazzFitness,
-    BluesFitness,
-    AmbientFitness,
-    FITNESS_FUNCTIONS,
-)
+from .genres import *

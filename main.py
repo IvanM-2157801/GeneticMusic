@@ -6,7 +6,7 @@ from core.genome_ops import (
     rhythm_to_phrase, phrase_with_rhythm,
     mutate_phrase, crossover_phrase
 )
-from fitness.genres import PopFitness
+from fitness.genres import PopMelodyFitness, PopRhythmFitness, MELODY_FITNESS, RHYTHM_FITNESS
 
 # Constants
 BPM = 128
@@ -18,6 +18,9 @@ MAX_SUBDIVISION = 4  # Max notes per beat (1=quarter, 2=eighth, 3=triplet, 4=six
 POPULATION_SIZE = 25
 MUTATION_RATE = 0.25
 ELITISM_COUNT = 6
+
+# Genre selection
+GENRE = "pop"  # Options: "pop", "jazz", "blues", "ambient"
 
 # Scale to use (C major)
 SCALE = [NoteName.C, NoteName.D, NoteName.E, NoteName.F, NoteName.G, NoteName.A, NoteName.B]
@@ -98,7 +101,7 @@ def user_fitness_fn(genome, to_strudel_fn) -> float:
 def evolve_rhythm() -> str:
     """Evolve a rhythm pattern and return the best one."""
     print("\n" + "="*50)
-    print("PHASE 1: EVOLVING RHYTHM")
+    print(f"PHASE 1: EVOLVING RHYTHM ({GENRE})")
     print("="*50)
     
     ga = GeneticAlgorithm[str](
@@ -107,6 +110,7 @@ def evolve_rhythm() -> str:
         elitism_count=ELITISM_COUNT,
     )
     
+    rhythm_fit = RHYTHM_FITNESS[GENRE]()
     population = [Individual(random_rhythm(TOTAL_BEATS, MAX_SUBDIVISION)) for _ in range(POPULATION_SIZE)]
     generation = 0
     
@@ -114,7 +118,7 @@ def evolve_rhythm() -> str:
         print(f"\n=== Rhythm Generation {generation} ===")
         
         def rhythm_fitness(rhythm: str) -> float:
-            return user_fitness_fn(rhythm, rhythm_to_strudel)
+            return rhythm_fit.evaluate(rhythm)
         
         population = ga.evolve(
             population=population,
@@ -124,9 +128,13 @@ def evolve_rhythm() -> str:
         )
         
         best = population[0]
-        print(f"Best rhythm: {best.genome} (fitness: {best.fitness})")
+        print(f"Best rhythm: {best.genome} (fitness: {best.fitness:.3f})")
         
-        if best.fitness >= 6:
+        # Show the rhythm
+        notes = rhythm_to_strudel(best.genome)
+        strudel.create_strudel(notes, TOTAL_BEATS)
+        
+        if best.fitness >= 0.85:
             print("\n✓ Rhythm selected!")
             return best.genome
         
@@ -138,7 +146,7 @@ def evolve_rhythm() -> str:
 def evolve_melody(rhythm: str) -> Phrase:
     """Evolve melody pitches using the fixed rhythm pattern."""
     print("\n" + "="*50)
-    print("PHASE 2: EVOLVING MELODY")
+    print(f"PHASE 2: EVOLVING MELODY ({GENRE})")
     print(f"Using rhythm: {rhythm}")
     print("="*50)
     
@@ -154,14 +162,14 @@ def evolve_melody(rhythm: str) -> Phrase:
         for _ in range(POPULATION_SIZE)
     ]
     
-    popfit = PopFitness()
+    melody_fit = MELODY_FITNESS[GENRE]()
     generation = 0
     
     while True:
         print(f"\n=== Melody Generation {generation} ===")
         
         def melody_fitness(phrase: Phrase) -> float:
-            return popfit.evaluate(Layer(name="melody", phrases=[phrase]))
+            return melody_fit.evaluate(Layer(name="melody", phrases=[phrase]))
         
         def melody_mutate(phrase: Phrase) -> Phrase:
             # Mutate the phrase but keep the rhythm

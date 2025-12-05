@@ -1,10 +1,17 @@
 from .base import (
     FitnessFunction,
+    RhythmFitnessFunction,
     note_variety,
     rest_ratio,
     interval_smoothness,
     scale_adherence,
     rhythmic_variety,
+    rhythm_density,
+    rhythm_rest_ratio,
+    rhythm_variety,
+    rhythm_syncopation,
+    rhythm_regularity,
+    rhythm_downbeat_emphasis,
     MAJOR_SCALE,
     MINOR_SCALE,
     PENTATONIC,
@@ -13,8 +20,10 @@ from .base import (
 from core.music import Layer, Phrase, NoteName
 
 
-class PopFitness(FitnessFunction):
-    """Fitness for pop music: catchy, repetitive, major key."""
+# === Melody Fitness Functions ===
+
+class PopMelodyFitness(FitnessFunction):
+    """Melody fitness for pop music: catchy, smooth, major key."""
     
     def evaluate(self, layer: Layer) -> float:
         if not layer.phrases:
@@ -24,10 +33,8 @@ class PopFitness(FitnessFunction):
         for phrase in layer.phrases:
             score = (
                 0.50 * scale_adherence(phrase, MAJOR_SCALE) +
-                0.25 * interval_smoothness(phrase) +
-                0.12 * (1 - rest_ratio(phrase)) +  # Prefer fewer rests
-                # 0.10 * self._repetition_bonus(phrase) +
-                0.13 * rhythmic_variety(phrase)
+                0.30 * interval_smoothness(phrase) +
+                0.20 * self._repetition_bonus(phrase)
             )
             scores.append(score)
         
@@ -37,7 +44,6 @@ class PopFitness(FitnessFunction):
         """Reward repeated motifs."""
         if len(phrase.notes) < 4:
             return 0.0
-        # Check for 2-note patterns
         patterns = []
         for i in range(len(phrase.notes) - 1):
             p = (phrase.notes[i].pitch, phrase.notes[i + 1].pitch)
@@ -47,8 +53,8 @@ class PopFitness(FitnessFunction):
         return 1 - (unique / len(patterns)) if patterns else 0.0
 
 
-class JazzFitness(FitnessFunction):
-    """Fitness for jazz: chromatic movement, syncopation, variety."""
+class JazzMelodyFitness(FitnessFunction):
+    """Melody fitness for jazz: chromatic, varied."""
     
     def evaluate(self, layer: Layer) -> float:
         if not layer.phrases:
@@ -57,11 +63,9 @@ class JazzFitness(FitnessFunction):
         scores = []
         for phrase in layer.phrases:
             score = (
-                0.25 * note_variety(phrase) +
-                0.25 * rhythmic_variety(phrase) +
-                0.2 * self._chromatic_interest(phrase) +
-                0.15 * (0.5 + 0.5 * rest_ratio(phrase)) +  # Some rests good
-                0.15 * self._syncopation_score(phrase)
+                0.35 * note_variety(phrase) +
+                0.35 * self._chromatic_interest(phrase) +
+                0.30 * interval_smoothness(phrase)
             )
             scores.append(score)
         
@@ -79,15 +83,10 @@ class JazzFitness(FitnessFunction):
                 semitone_moves += 1
         
         return min(semitone_moves / (len(notes) - 1) * 2, 1.0)
-    
-    def _syncopation_score(self, phrase: Phrase) -> float:
-        """Reward off-beat rhythms."""
-        odd_durations = sum(1 for n in phrase.notes if n.duration in [0.25, 0.75])
-        return min(odd_durations / max(len(phrase.notes), 1), 1.0)
 
 
-class BluesFitness(FitnessFunction):
-    """Fitness for blues: blue notes, bends, call-response."""
+class BluesMelodyFitness(FitnessFunction):
+    """Melody fitness for blues: blue notes, smooth."""
     
     def evaluate(self, layer: Layer) -> float:
         if not layer.phrases:
@@ -96,10 +95,9 @@ class BluesFitness(FitnessFunction):
         scores = []
         for phrase in layer.phrases:
             score = (
-                0.35 * scale_adherence(phrase, BLUES_SCALE) +
-                0.25 * self._blue_note_bonus(phrase) +
-                0.2 * interval_smoothness(phrase) +
-                0.2 * rhythmic_variety(phrase)
+                0.40 * scale_adherence(phrase, BLUES_SCALE) +
+                0.35 * self._blue_note_bonus(phrase) +
+                0.25 * interval_smoothness(phrase)
             )
             scores.append(score)
         
@@ -113,13 +111,12 @@ class BluesFitness(FitnessFunction):
             return 0.0
         
         blue_count = sum(1 for n in notes if n.pitch in blue_notes)
-        # Want some but not all
         ratio = blue_count / len(notes)
         return 1.0 if 0.2 <= ratio <= 0.4 else max(0, 1 - abs(ratio - 0.3) * 2)
 
 
-class AmbientFitness(FitnessFunction):
-    """Fitness for ambient: long notes, slow movement, sparse."""
+class AmbientMelodyFitness(FitnessFunction):
+    """Melody fitness for ambient: smooth, pentatonic."""
     
     def evaluate(self, layer: Layer) -> float:
         if not layer.phrases:
@@ -128,27 +125,121 @@ class AmbientFitness(FitnessFunction):
         scores = []
         for phrase in layer.phrases:
             score = (
-                0.3 * self._long_note_ratio(phrase) +
-                0.3 * interval_smoothness(phrase) +
-                0.2 * rest_ratio(phrase) +  # Rests are good
-                0.2 * scale_adherence(phrase, PENTATONIC)
+                0.50 * interval_smoothness(phrase) +
+                0.50 * scale_adherence(phrase, PENTATONIC)
             )
             scores.append(score)
         
         return sum(scores) / len(scores)
+
+
+# === Rhythm Fitness Functions ===
+
+class PopRhythmFitness(RhythmFitnessFunction):
+    """Rhythm fitness for pop: regular, moderate density, downbeat emphasis."""
     
-    def _long_note_ratio(self, phrase: Phrase) -> float:
-        """Reward longer note durations."""
-        if not phrase.notes:
+    def evaluate(self, rhythm: str) -> float:
+        if not rhythm:
             return 0.0
-        long_notes = sum(1 for n in phrase.notes if n.duration >= 1.0)
-        return long_notes / len(phrase.notes)
+        
+        density = rhythm_density(rhythm)
+        regularity = rhythm_regularity(rhythm)
+        downbeat = rhythm_downbeat_emphasis(rhythm)
+        rests = rhythm_rest_ratio(rhythm)
+        
+        # Pop wants: moderate density (0.3-0.6), regular patterns, strong downbeats, few rests
+        density_score = 1.0 - abs(density - 0.4) * 2  # Optimal around 0.4
+        rest_score = 1.0 - rests  # Fewer rests better
+        
+        return (
+            0.30 * max(0, density_score) +
+            0.30 * regularity +
+            0.25 * downbeat +
+            0.15 * rest_score
+        )
+
+
+class JazzRhythmFitness(RhythmFitnessFunction):
+    """Rhythm fitness for jazz: syncopated, varied, some rests."""
+    
+    def evaluate(self, rhythm: str) -> float:
+        if not rhythm:
+            return 0.0
+        
+        syncopation = rhythm_syncopation(rhythm)
+        variety = rhythm_variety(rhythm)
+        rests = rhythm_rest_ratio(rhythm)
+        density = rhythm_density(rhythm)
+        
+        # Jazz wants: syncopation, variety, moderate rests, moderate-high density
+        rest_score = 1.0 - abs(rests - 0.2) * 3  # Some rests good (around 20%)
+        density_score = 1.0 - abs(density - 0.5) * 2  # Moderate-high density
+        
+        return (
+            0.35 * syncopation +
+            0.25 * variety +
+            0.20 * max(0, rest_score) +
+            0.20 * max(0, density_score)
+        )
+
+
+class BluesRhythmFitness(RhythmFitnessFunction):
+    """Rhythm fitness for blues: shuffle feel, moderate, some swing."""
+    
+    def evaluate(self, rhythm: str) -> float:
+        if not rhythm:
+            return 0.0
+        
+        density = rhythm_density(rhythm)
+        variety = rhythm_variety(rhythm)
+        downbeat = rhythm_downbeat_emphasis(rhythm)
+        syncopation = rhythm_syncopation(rhythm)
+        
+        # Blues wants: moderate density, some variety, downbeat emphasis with swing
+        density_score = 1.0 - abs(density - 0.35) * 2
+        
+        return (
+            0.30 * max(0, density_score) +
+            0.25 * downbeat +
+            0.25 * syncopation +
+            0.20 * variety
+        )
+
+
+class AmbientRhythmFitness(RhythmFitnessFunction):
+    """Rhythm fitness for ambient: sparse, lots of rests, slow."""
+    
+    def evaluate(self, rhythm: str) -> float:
+        if not rhythm:
+            return 0.0
+        
+        density = rhythm_density(rhythm)
+        rests = rhythm_rest_ratio(rhythm)
+        regularity = rhythm_regularity(rhythm)
+        
+        # Ambient wants: low density, many rests, regular/predictable
+        density_score = 1.0 - density  # Lower density better
+        
+        return (
+            0.40 * density_score +
+            0.35 * rests +
+            0.25 * regularity
+        )
+
+
 
 
 # Registry for easy access
-FITNESS_FUNCTIONS = {
-    "pop": PopFitness,
-    "jazz": JazzFitness,
-    "blues": BluesFitness,
-    "ambient": AmbientFitness,
+MELODY_FITNESS = {
+    "pop": PopMelodyFitness,
+    "jazz": JazzMelodyFitness,
+    "blues": BluesMelodyFitness,
+    "ambient": AmbientMelodyFitness,
+}
+
+RHYTHM_FITNESS = {
+    "pop": PopRhythmFitness,
+    "jazz": JazzRhythmFitness,
+    "blues": BluesRhythmFitness,
+    "ambient": AmbientRhythmFitness,
 }
