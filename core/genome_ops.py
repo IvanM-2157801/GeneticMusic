@@ -86,78 +86,34 @@ def phrase_with_rhythm(
     return Phrase(notes)
 
 
-# === Note Operations ===
-
-def random_note(
-    scale: list[NoteName] | None = None,
-    octave_range: tuple[int, int] = (3, 5),
-) -> Note:
-    if random.random() < REST_PROBABILITY:
-        return Note(NoteName.REST)
-    
-    if scale is None:
-        scale = list(NoteName)
-        scale.remove(NoteName.REST)
-    
-    return Note(
-        pitch=random.choice(scale),
-        octave=random.randint(*octave_range),
-        duration=random.choice([0.25, 0.5, 1.0, 2.0])
-    )
-
-
-def random_phrase(length: int, **note_kwargs) -> Phrase:
-    return Phrase([random_note(**note_kwargs) for _ in range(length)])
-
-
-def random_layer(
-    name: str,
-    phrase_count: int,
-    phrase_length: int,
-    instrument: str = "piano",
-    **note_kwargs,
-) -> Layer:
-    return Layer(
-        name=name,
-        phrases=[random_phrase(phrase_length, **note_kwargs) for _ in range(phrase_count)],
-        instrument=instrument,
-    )
-
-
 # === Mutation Operations ===
 
-def mutate_note(note: Note, scale: list[NoteName] | None = None) -> Note:
-    mutation_type = random.choice(["pitch", "octave", "duration"])
+def mutate_note(note: Note, scale: list[NoteName]) -> Note:
+    mutation_type = random.choice(["pitch", "octave"])
     new_note = deepcopy(note)
     
     if mutation_type == "pitch":
-        if scale:
-            new_note.pitch = random.choice(scale)
-        else:
-            pitches = [p for p in NoteName if p != NoteName.REST]
-            new_note.pitch = random.choice(pitches)
+        new_note.pitch = random.choice(scale)
     elif mutation_type == "octave":
         new_note.octave = max(1, min(7, new_note.octave + random.choice([-1, 1])))
-    elif mutation_type == "duration":
-        new_note.duration = random.choice([0.25, 0.5, 1.0, 2.0])
     
     return new_note
 
 
-def mutate_phrase(phrase: Phrase, mutation_rate: float = 0.1) -> Phrase:
+def mutate_phrase(phrase: Phrase, scale: list[NoteName], mutation_rate: float = 0.1) -> Phrase:
     new_notes = []
     for note in phrase.notes:
         if random.random() < mutation_rate:
-            new_notes.append(mutate_note(note))
+            new_notes.append(mutate_note(note, scale))
         else:
             new_notes.append(deepcopy(note))
     return Phrase(new_notes)
 
 
-def mutate_layer(layer: Layer, mutation_rate: float = 0.1) -> Layer:
+def mutate_layer(layer: Layer, scale: list[NoteName], mutation_rate: float = 0.1) -> Layer:
     return Layer(
         name=layer.name,
-        phrases=[mutate_phrase(p, mutation_rate) for p in layer.phrases],
+        phrases=[mutate_phrase(p, mutation_rate, scale) for p in layer.phrases],
         instrument=layer.instrument,
     )
 

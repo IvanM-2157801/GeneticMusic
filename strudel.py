@@ -5,7 +5,7 @@ def create_strudel(notes: list[str], total_notes: int):
 setcpm(160/{total_notes})
 
 $: note("{" ".join(notes)}")
-.scale("c:major").gain(0.2)
+.scale("c:major").gain(0.2).sound("piano")
 """
 
 	encoded_script = base64.b64encode(strudel_script.encode('utf-8')).decode('utf-8')

@@ -32,9 +32,11 @@ class PopMelodyFitness(FitnessFunction):
         scores = []
         for phrase in layer.phrases:
             score = (
-                0.50 * scale_adherence(phrase, MAJOR_SCALE) +
-                0.30 * interval_smoothness(phrase) +
-                0.20 * self._repetition_bonus(phrase)
+                # 0.60 * scale_adherence(phrase, MAJOR_SCALE) +
+                0.40 * interval_smoothness(phrase) +
+                0.20 * note_variety(phrase) +
+                0.15 * self._repetition_bonus(phrase) +
+                0.25 * rest_ratio(phrase)
             )
             scores.append(score)
         
@@ -152,10 +154,10 @@ class PopRhythmFitness(RhythmFitnessFunction):
         rest_score = 1.0 - rests  # Fewer rests better
         
         return (
-            0.30 * max(0, density_score) +
-            0.30 * regularity +
-            0.25 * downbeat +
-            0.15 * rest_score
+            0.10 * max(0, density_score) +
+            0.15 * regularity +
+            0.55 * downbeat +
+            0.20 * rest_score
         )
 
 

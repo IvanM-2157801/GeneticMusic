@@ -9,21 +9,21 @@ from core.genome_ops import (
 from fitness.genres import PopMelodyFitness, PopRhythmFitness, MELODY_FITNESS, RHYTHM_FITNESS
 
 # Constants
-BPM = 128
-BARS = 2
+BPM = 80
+BARS = 4
 BEATS_PER_BAR = 4
 TOTAL_BEATS = BARS * BEATS_PER_BAR
 MAX_SUBDIVISION = 4  # Max notes per beat (1=quarter, 2=eighth, 3=triplet, 4=sixteenth)
 
 POPULATION_SIZE = 25
-MUTATION_RATE = 0.25
+MUTATION_RATE = 0.35
 ELITISM_COUNT = 6
 
 # Genre selection
 GENRE = "pop"  # Options: "pop", "jazz", "blues", "ambient"
 
 # Scale to use (C major)
-SCALE = [NoteName.C, NoteName.D, NoteName.E, NoteName.F, NoteName.G, NoteName.A, NoteName.B]
+SCALE = [NoteName.C, NoteName.D, NoteName.E, NoteName.F, NoteName.G, NoteName.A, NoteName.B, NoteName.REST]
 
 
 def rhythm_to_strudel(rhythm: str) -> list[str]:
@@ -134,7 +134,7 @@ def evolve_rhythm() -> str:
         notes = rhythm_to_strudel(best.genome)
         strudel.create_strudel(notes, TOTAL_BEATS)
         
-        if best.fitness >= 0.85:
+        if best.fitness >= 0.92:
             print("\n✓ Rhythm selected!")
             return best.genome
         
@@ -173,7 +173,7 @@ def evolve_melody(rhythm: str) -> Phrase:
         
         def melody_mutate(phrase: Phrase) -> Phrase:
             # Mutate the phrase but keep the rhythm
-            mutated = mutate_phrase(phrase, mutation_rate=MUTATION_RATE)
+            mutated = mutate_phrase(phrase, SCALE, mutation_rate=MUTATION_RATE)
             return phrase_with_rhythm(mutated, rhythm)
         
         def melody_crossover(p1: Phrase, p2: Phrase) -> Phrase:
