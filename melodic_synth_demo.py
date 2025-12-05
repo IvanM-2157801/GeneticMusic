@@ -102,17 +102,6 @@ def main():
     print("-"*60)
     print(strudel_code)
 
-    print("\n" + "="*60)
-    print("✨ COMPOSITION ANALYSIS ✨")
-    print("="*60)
-    print("\nNotice the difference:")
-    print("  - MELODY: Uses scale degrees 0-7 with .sub(7) for transposition")
-    print("  - MELODY: Larger intervals, more varied (melodic)")
-    print("  - SYNTH:  Smoother intervals, more stable (supportive)")
-    print("  - Both use the same random scale")
-    print("  - Different gain and lpf settings for distinct sounds")
-    print()
-
 
 if __name__ == "__main__":
     main()

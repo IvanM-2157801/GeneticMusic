@@ -79,12 +79,12 @@ class Phrase:
                 # Rest beat
                 beat_groups.append("~")
             else:
+                beat_notes = []
                 if drum_sound:
                     # For drums, just repeat the sound name
                     beat_notes = [drum_sound] * subdivisions
                 else:
                     # For melodic instruments, use actual notes
-                    beat_notes = []
                     for _ in range(subdivisions):
                         if note_idx < len(self.notes):
                             note = self.notes[note_idx]

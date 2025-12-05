@@ -107,18 +107,5 @@ def main():
     print("-"*60)
     print(strudel_code)
 
-    print("\n" + "="*60)
-    print("✨ DRUM PATTERN ANALYSIS ✨")
-    print("="*60)
-    print("\nNotice:")
-    print("  - Each drum uses sound() instead of n()")
-    print("  - KICK: Strong on beats 1 and 3, sparse and powerful")
-    print("  - HI-HAT: Consistent eighth notes, keeps time")
-    print("  - SNARE: Backbeat emphasis (beats 2 and 4)")
-    print("  - OPEN HI-HAT: Sparse accents for texture")
-    print("  - All rhythms work together to create a cohesive groove")
-    print()
-
-
 if __name__ == "__main__":
     main()

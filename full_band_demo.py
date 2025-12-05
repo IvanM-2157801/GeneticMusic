@@ -170,18 +170,6 @@ def main():
     print("-" * 60)
     print(strudel_code)
 
-    print("\n" + "=" * 60)
-    print("✨ COMPOSITION ANALYSIS ✨")
-    print("=" * 60)
-    print("\nNotice the layering:")
-    print("  - MELODY: Varied intervals with .sub(7), bright sound (lpf=8000)")
-    print("  - SYNTH: Smooth intervals, warm sound (lpf=2000)")
-    print("  - BASS: Low octave with .sub(-7), deep sound (lpf=1000)")
-    print("  - All melodic layers use the same random scale")
-    print("  - DRUMS: Use sound() notation with rhythm patterns")
-    print("  - Complete band arrangement with harmony and groove")
-    print()
-
 
 if __name__ == "__main__":
     main()

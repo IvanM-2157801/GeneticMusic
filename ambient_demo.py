@@ -137,18 +137,6 @@ def main():
     print("-" * 60)
     print(strudel_code)
 
-    print("\n" + "=" * 60)
-    print("✨ COMPOSITION ANALYSIS ✨")
-    print("=" * 60)
-    print("\nNotice:")
-    print("  - PIANO: Uses comma-separated notes [0, 2, 4] for chords")
-    print("  - SYNTH: Simple, sustained melodic line")
-    print("  - Slow tempo (60 BPM) for ambient feel")
-    print("  - Sparse drum pattern for grounding")
-    print("  - ChordFitness encourages triadic intervals (thirds, fifths)")
-    print("  - All layers share the same random scale")
-    print()
-
 
 if __name__ == "__main__":
     main()
