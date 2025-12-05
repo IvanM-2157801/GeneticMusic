@@ -1,4 +1,5 @@
 """Improved multi-layer composer with separate rhythm and note evolution."""
+
 from dataclasses import dataclass
 from typing import Callable, Optional
 from core.genetic import GeneticAlgorithm, Individual
@@ -18,11 +19,12 @@ from fitness.base import FitnessFunction
 @dataclass
 class LayerConfig:
     """Configuration for a layer with separate rhythm and note evolution."""
+
     name: str
     instrument: str
-    bars: int = 2
-    beats_per_bar: int = 4
-    max_subdivision: int = 4
+    bars: int = 1
+    beats_per_bar: int = 8
+    max_subdivision: int = 2
     octave_range: tuple[int, int] = (4, 5)
     scale: list[NoteName] = None
     rhythm_fitness_fn: Callable[[str], float] = None  # Takes rhythm string
@@ -33,13 +35,22 @@ class LayerConfig:
     gain: float = 0.5
     lpf: int = 4000
     use_scale_degrees: bool = True  # Use 0-7 scale degrees
+    chord_mode: bool = False  # Use comma-separated notes for chords
+    # Drum parameters
+    is_drum: bool = False  # If True, only evolves rhythm (no melody)
+    drum_sound: str = ""  # Drum sound name (e.g., "bd", "hh", "sd")
 
     def __post_init__(self):
         if self.scale is None:
             # Default to C major
             self.scale = [
-                NoteName.C, NoteName.D, NoteName.E, NoteName.F,
-                NoteName.G, NoteName.A, NoteName.B
+                NoteName.C,
+                NoteName.D,
+                NoteName.E,
+                NoteName.F,
+                NoteName.G,
+                NoteName.A,
+                NoteName.B,
             ]
 
     @property
@@ -72,11 +83,7 @@ class LayeredComposer:
         """Add a layer configuration."""
         self.layer_configs.append(config)
 
-    def evolve_layer_rhythm(
-        self,
-        config: LayerConfig,
-        verbose: bool = True
-    ) -> str:
+    def evolve_layer_rhythm(self, config: LayerConfig, verbose: bool = True) -> str:
         """Evolve rhythm for a single layer."""
         if verbose:
             print(f"\n{'='*60}")
@@ -101,7 +108,9 @@ class LayeredComposer:
             population = ga.evolve(
                 population=population,
                 fitness_fn=config.rhythm_fitness_fn,
-                mutate_fn=lambda r: mutate_rhythm(r, self.mutation_rate, config.max_subdivision),
+                mutate_fn=lambda r: mutate_rhythm(
+                    r, self.mutation_rate, config.max_subdivision
+                ),
                 crossover_fn=crossover_rhythm,
             )
 
@@ -109,7 +118,9 @@ class LayeredComposer:
             best_fitness = best.fitness
 
             if verbose and (gen % 5 == 0 or gen == self.rhythm_generations - 1):
-                print(f"  Gen {gen:3d}: Best fitness = {best_fitness:.4f}, rhythm = {best.genome}")
+                print(
+                    f"  Gen {gen:3d}: Best fitness = {best_fitness:.4f}, rhythm = {best.genome}"
+                )
 
         best_rhythm = population[0].genome
         if verbose:
@@ -118,10 +129,7 @@ class LayeredComposer:
         return best_rhythm
 
     def evolve_layer_melody(
-        self,
-        config: LayerConfig,
-        rhythm: str,
-        verbose: bool = True
+        self, config: LayerConfig, rhythm: str, verbose: bool = True
     ) -> Phrase:
         """Evolve melody for a single layer with fixed rhythm."""
         if verbose:
@@ -138,13 +146,19 @@ class LayeredComposer:
 
         # Initialize population with the rhythm
         population = [
-            Individual(rhythm_to_phrase(rhythm, scale=config.scale, octave_range=config.octave_range))
+            Individual(
+                rhythm_to_phrase(
+                    rhythm, scale=config.scale, octave_range=config.octave_range
+                )
+            )
             for _ in range(self.population_size)
         ]
 
         # Evolve
         def melody_fitness(phrase: Phrase) -> float:
-            layer = Layer(name=config.name, phrases=[phrase], instrument=config.instrument)
+            layer = Layer(
+                name=config.name, phrases=[phrase], instrument=config.instrument
+            )
             return config.melody_fitness_fn.evaluate(layer)
 
         def melody_mutate(phrase: Phrase) -> Phrase:
@@ -183,9 +197,15 @@ class LayeredComposer:
             rhythm = self.evolve_layer_rhythm(config, verbose=verbose)
             self.evolved_rhythms[config.name] = rhythm
 
-            # Phase 2: Evolve melody with that rhythm
-            phrase = self.evolve_layer_melody(config, rhythm, verbose=verbose)
-            self.evolved_phrases[config.name] = phrase
+            # Phase 2: Evolve melody with that rhythm (skip for drums)
+            if config.is_drum:
+                # Drums only need rhythm, no melody
+                if verbose:
+                    print(f"✓ Drum layer '{config.name}' complete (rhythm only)\n")
+                self.evolved_phrases[config.name] = None
+            else:
+                phrase = self.evolve_layer_melody(config, rhythm, verbose=verbose)
+                self.evolved_phrases[config.name] = phrase
 
     def get_composition(self, bpm: int = 120, random_scale: bool = True) -> Composition:
         """Get the final composition with all evolved layers.
@@ -202,37 +222,59 @@ class LayeredComposer:
 
         layers = []
         for config in self.layer_configs:
-            phrase = self.evolved_phrases.get(config.name)
             rhythm = self.evolved_rhythms.get(config.name)
-            if phrase:
-                # Use config scale if specified, otherwise use composition scale
-                layer_scale = config.strudel_scale if config.strudel_scale else composition_scale
 
-                layer = Layer(
-                    name=config.name,
-                    phrases=[phrase],
-                    instrument=config.instrument,
-                    rhythm=rhythm if rhythm else "",
-                    scale=layer_scale,
-                    octave_shift=config.octave_shift,
-                    gain=config.gain,
-                    lpf=config.lpf,
-                    use_scale_degrees=config.use_scale_degrees
-                )
-                layers.append(layer)
+            if config.is_drum:
+                # Drum layer: only rhythm, no phrases
+                if rhythm:
+                    layer = Layer(
+                        name=config.name,
+                        phrases=[],
+                        instrument=config.instrument,
+                        rhythm=rhythm,
+                        gain=config.gain,
+                        is_drum=True,
+                        drum_sound=config.drum_sound,
+                    )
+                    layers.append(layer)
+            else:
+                # Melodic layer: needs phrases
+                phrase = self.evolved_phrases.get(config.name)
+                if phrase:
+                    # Use config scale if specified, otherwise use composition scale
+                    layer_scale = (
+                        config.strudel_scale if config.strudel_scale else composition_scale
+                    )
+
+                    layer = Layer(
+                        name=config.name,
+                        phrases=[phrase],
+                        instrument=config.instrument,
+                        rhythm=rhythm if rhythm else "",
+                        scale=layer_scale,
+                        octave_shift=config.octave_shift,
+                        gain=config.gain,
+                        lpf=config.lpf,
+                        use_scale_degrees=config.use_scale_degrees,
+                        chord_mode=config.chord_mode,
+                    )
+                    layers.append(layer)
 
         return Composition(layers=layers, bpm=bpm)
 
     def print_summary(self) -> None:
         """Print a summary of all evolved layers."""
         from fitness.rhythm import (
-            rhythm_complexity, rhythm_density, rhythm_syncopation,
-            rhythm_groove, rhythm_rest_ratio
+            rhythm_complexity,
+            rhythm_density,
+            rhythm_syncopation,
+            rhythm_groove,
+            rhythm_rest_ratio,
         )
 
-        print("\n" + "="*60)
+        print("\n" + "=" * 60)
         print("COMPOSITION SUMMARY")
-        print("="*60)
+        print("=" * 60)
         for config in self.layer_configs:
             rhythm = self.evolved_rhythms.get(config.name, "Not evolved")
             phrase = self.evolved_phrases.get(config.name)

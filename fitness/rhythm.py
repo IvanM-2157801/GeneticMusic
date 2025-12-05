@@ -29,7 +29,7 @@ def rhythm_rest_ratio(rhythm: str) -> float:
     """
     if not rhythm:
         return 0.0
-    rests = rhythm.count('0')
+    rests = rhythm.count("0")
     return rests / len(rhythm)
 
 
@@ -41,7 +41,9 @@ def rhythm_density(rhythm: str) -> float:
     if not rhythm:
         return 0.0
     total_notes = sum(int(char) for char in rhythm)
-    return min(total_notes / (len(rhythm) * 4.0), 1.0)  # Normalize to max 4 notes per beat
+    return min(
+        total_notes / (len(rhythm) * 4.0), 1.0
+    )  # Normalize to max 4 notes per beat
 
 
 def rhythm_syncopation(rhythm: str) -> float:
@@ -119,6 +121,7 @@ def rhythm_offbeat_emphasis(rhythm: str) -> float:
 
 # Genre-specific rhythm fitness functions
 
+
 def pop_rhythm_fitness(rhythm: str) -> float:
     """Fitness for pop rhythms: consistent, catchy, moderate density.
 
@@ -134,11 +137,11 @@ def pop_rhythm_fitness(rhythm: str) -> float:
     density_score = 1.0 - abs(0.5 - rhythm_density(rhythm))
 
     return (
-        0.35 * rhythm_consistency(rhythm) +  # Very repetitive/catchy
-        0.25 * rhythm_groove(rhythm) +  # Strong groove
-        0.20 * (1 - rhythm_rest_ratio(rhythm)) +  # Few rests
-        0.15 * density_score +  # Moderate density (not too dense)
-        0.05 * (1 - rhythm_complexity(rhythm))  # Simple patterns
+        0.35 * rhythm_consistency(rhythm)  # Very repetitive/catchy
+        + 0.25 * rhythm_groove(rhythm)  # Strong groove
+        + 0.20 * (1 - rhythm_rest_ratio(rhythm))  # Few rests
+        + 0.15 * density_score  # Moderate density (not too dense)
+        + 0.05 * (1 - rhythm_complexity(rhythm))  # Simple patterns
     )
 
 
@@ -157,11 +160,11 @@ def jazz_rhythm_fitness(rhythm: str) -> float:
     rest_score = 1.0 - abs(0.2 - rhythm_rest_ratio(rhythm)) / 0.2
 
     return (
-        0.30 * rhythm_syncopation(rhythm) +  # Syncopated
-        0.25 * rhythm_complexity(rhythm) +  # Complex patterns
-        0.20 * rhythm_offbeat_emphasis(rhythm) +  # Offbeat accents
-        0.15 * rest_score +  # Some rests but not too many
-        0.10 * (1 - rhythm_consistency(rhythm))  # Varied, not repetitive
+        0.30 * rhythm_syncopation(rhythm)  # Syncopated
+        + 0.25 * rhythm_complexity(rhythm)  # Complex patterns
+        + 0.20 * rhythm_offbeat_emphasis(rhythm)  # Offbeat accents
+        + 0.15 * rest_score  # Some rests but not too many
+        + 0.10 * (1 - rhythm_consistency(rhythm))  # Varied, not repetitive
     )
 
 
@@ -180,11 +183,11 @@ def funk_rhythm_fitness(rhythm: str) -> float:
     density_score = 1.0 - abs(0.7 - rhythm_density(rhythm))
 
     return (
-        0.40 * rhythm_groove(rhythm) +  # Maximum groove
-        0.25 * rhythm_syncopation(rhythm) +  # Highly syncopated
-        0.20 * rhythm_offbeat_emphasis(rhythm) +  # Offbeat accents
-        0.10 * density_score +  # Moderate to high density
-        0.05 * (1 - rhythm_rest_ratio(rhythm))  # Few rests
+        0.40 * rhythm_groove(rhythm)  # Maximum groove
+        + 0.25 * rhythm_syncopation(rhythm)  # Highly syncopated
+        + 0.20 * rhythm_offbeat_emphasis(rhythm)  # Offbeat accents
+        + 0.10 * density_score  # Moderate to high density
+        + 0.05 * (1 - rhythm_rest_ratio(rhythm))  # Few rests
     )
 
 
@@ -192,19 +195,29 @@ def ambient_rhythm_fitness(rhythm: str) -> float:
     """Fitness for ambient rhythms: simple, sparse, meditative.
 
     Characteristics:
-    - Very sparse (many rests)
+    - Sparse but not empty (some notes)
     - Simple patterns (low complexity)
     - Consistent (meditative repetition)
     - Low density (spacious)
 
     Example good patterns: "10001000", "00100010", "01000100"
     """
+    # Penalize all-zero rhythms heavily
+    note_count = sum(1 for c in rhythm if int(c) > 0)
+    if note_count == 0:
+        return 0.0  # All rests is unacceptable
+
+    # Target 20-40% density (sparse but has notes)
+    density = rhythm_density(rhythm)
+    target_density = 0.3
+    density_score = 1.0 - abs(density - target_density) / target_density
+
     return (
-        0.35 * rhythm_rest_ratio(rhythm) +  # Many rests
-        0.25 * (1 - rhythm_density(rhythm)) +  # Very sparse
-        0.20 * (1 - rhythm_complexity(rhythm)) +  # Simple
-        0.15 * rhythm_consistency(rhythm) +  # Repetitive
-        0.05 * (1 - rhythm_syncopation(rhythm))  # Steady/consistent
+        0.35 * density_score  # Sparse but not empty
+        + 0.25 * (1 - rhythm_complexity(rhythm))  # Simple
+        + 0.20 * rhythm_consistency(rhythm)  # Repetitive
+        + 0.15 * rhythm_rest_ratio(rhythm)  # Has rests
+        + 0.05 * (1 - rhythm_syncopation(rhythm))  # Steady/consistent
     )
 
 
@@ -223,11 +236,11 @@ def rock_rhythm_fitness(rhythm: str) -> float:
     density_score = 1.0 - abs(0.7 - rhythm_density(rhythm))
 
     return (
-        0.30 * density_score +  # High but not extreme density
-        0.25 * rhythm_groove(rhythm) +  # Strong groove
-        0.20 * (1 - rhythm_rest_ratio(rhythm)) +  # Few rests
-        0.15 * rhythm_consistency(rhythm) +  # Consistent patterns
-        0.10 * (1 - rhythm_complexity(rhythm))  # Not too complex
+        0.30 * density_score  # High but not extreme density
+        + 0.25 * rhythm_groove(rhythm)  # Strong groove
+        + 0.20 * (1 - rhythm_rest_ratio(rhythm))  # Few rests
+        + 0.15 * rhythm_consistency(rhythm)  # Consistent patterns
+        + 0.10 * (1 - rhythm_complexity(rhythm))  # Not too complex
     )
 
 
@@ -247,11 +260,11 @@ def drum_rhythm_fitness(rhythm: str) -> float:
     density_score = 1.0 - abs(0.8 - rhythm_density(rhythm))
 
     return (
-        0.35 * rhythm_consistency(rhythm) +  # Very consistent beat
-        0.30 * density_score +  # High density
-        0.20 * (1 - rhythm_rest_ratio(rhythm)) +  # Minimal rests
-        0.10 * rhythm_groove(rhythm) +  # Groove
-        0.05 * (1 - rhythm_complexity(rhythm))  # Simple patterns
+        0.35 * rhythm_consistency(rhythm)  # Very consistent beat
+        + 0.30 * density_score  # High density
+        + 0.20 * (1 - rhythm_rest_ratio(rhythm))  # Minimal rests
+        + 0.10 * rhythm_groove(rhythm)  # Groove
+        + 0.05 * (1 - rhythm_complexity(rhythm))  # Simple patterns
     )
 
 
@@ -270,11 +283,11 @@ def bass_rhythm_fitness(rhythm: str) -> float:
     density_score = 1.0 - abs(0.5 - rhythm_density(rhythm))
 
     return (
-        0.35 * rhythm_consistency(rhythm) +  # Very repetitive
-        0.25 * rhythm_groove(rhythm) +  # Strong groove
-        0.20 * density_score +  # Moderate density
-        0.15 * (1 - rhythm_rest_ratio(rhythm)) +  # Few rests
-        0.05 * (1 - rhythm_complexity(rhythm))  # Simple patterns
+        0.35 * rhythm_consistency(rhythm)  # Very repetitive
+        + 0.25 * rhythm_groove(rhythm)  # Strong groove
+        + 0.20 * density_score  # Moderate density
+        + 0.15 * (1 - rhythm_rest_ratio(rhythm))  # Few rests
+        + 0.05 * (1 - rhythm_complexity(rhythm))  # Simple patterns
     )
 
 

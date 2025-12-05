@@ -58,17 +58,20 @@ class Phrase:
     def to_strudel(self) -> str:
         return " ".join(n.to_strudel() for n in self.notes)
 
-    def to_strudel_with_rhythm(self, rhythm: str, scale_degrees: bool = False) -> str:
+    def to_strudel_with_rhythm(self, rhythm: str, scale_degrees: bool = False, drum_sound: str = None, chord_mode: bool = False) -> str:
         """Convert phrase to Strudel notation preserving rhythm structure.
 
         Example: rhythm "2103" with 6 notes becomes "[n1 n2] [n3] ~ [n4 n5 n6]"
+        With chord_mode=True: "[n1, n2] [n3] ~ [n4, n5, n6]" (parallel notes)
 
         Args:
             rhythm: Rhythm pattern string (e.g., "2103")
             scale_degrees: If True, use scale degrees 0-7 instead of note names
+            drum_sound: If set, uses this drum sound name (e.g., "bd", "hh", "sd")
+            chord_mode: If True, uses comma separation for parallel notes (chords)
         """
-        note_idx = 0
         beat_groups = []
+        note_idx = 0
 
         for beat_char in rhythm:
             subdivisions = int(beat_char)
@@ -76,26 +79,32 @@ class Phrase:
                 # Rest beat
                 beat_groups.append("~")
             else:
-                # Collect notes for this beat
-                beat_notes = []
-                for _ in range(subdivisions):
-                    if note_idx < len(self.notes):
-                        note = self.notes[note_idx]
-                        if scale_degrees:
-                            # Use scale degree (0-7) based on pitch value
-                            if note.pitch == NoteName.REST:
-                                beat_notes.append("~")
+                if drum_sound:
+                    # For drums, just repeat the sound name
+                    beat_notes = [drum_sound] * subdivisions
+                else:
+                    # For melodic instruments, use actual notes
+                    beat_notes = []
+                    for _ in range(subdivisions):
+                        if note_idx < len(self.notes):
+                            note = self.notes[note_idx]
+                            if scale_degrees:
+                                # Use scale degree (0-7) based on pitch value
+                                if note.pitch == NoteName.REST:
+                                    beat_notes.append("~")
+                                else:
+                                    degree = note.pitch.value % 7
+                                    beat_notes.append(str(degree))
                             else:
-                                degree = note.pitch.value % 7
-                                beat_notes.append(str(degree))
-                        else:
-                            beat_notes.append(note.to_strudel())
-                        note_idx += 1
+                                beat_notes.append(note.to_strudel())
+                            note_idx += 1
 
                 if len(beat_notes) == 1:
                     beat_groups.append(beat_notes[0])
                 else:
-                    beat_groups.append("[" + " ".join(beat_notes) + "]")
+                    # Use comma separation for chords, space for sequential notes
+                    separator = ", " if chord_mode else " "
+                    beat_groups.append("[" + separator.join(beat_notes) + "]")
 
         return " ".join(beat_groups)
 
@@ -111,6 +120,9 @@ class Layer:
     gain: float = 0.5  # Volume/gain
     lpf: int = 4000  # Low-pass filter frequency
     use_scale_degrees: bool = True  # Use scale degrees 0-7 instead of note names
+    is_drum: bool = False  # If True, uses sound() instead of n()
+    drum_sound: str = ""  # Drum sound name (e.g., "bd", "hh", "sd")
+    chord_mode: bool = False  # If True, uses comma-separated notes for chords
 
     def to_strudel(self) -> str:
         """Convert layer to Strudel notation.
@@ -118,35 +130,60 @@ class Layer:
         If rhythm is set, uses rhythm-aware formatting.
         Otherwise, falls back to simple grouping.
         """
-        if self.rhythm and self.phrases:
-            # Use rhythm-aware formatting for each phrase
-            patterns = [p.to_strudel_with_rhythm(self.rhythm, self.use_scale_degrees) for p in self.phrases]
-            pattern = " ".join(patterns)
+        if self.is_drum:
+            # Drum layer: use sound() with rhythm structure
+            if self.rhythm:
+                # Convert rhythm to sound pattern
+                beat_groups = []
+                for beat_char in self.rhythm:
+                    subdivisions = int(beat_char)
+                    if subdivisions == 0:
+                        beat_groups.append("~")
+                    elif subdivisions == 1:
+                        beat_groups.append(self.drum_sound)
+                    else:
+                        beat_groups.append("[" + " ".join([self.drum_sound] * subdivisions) + "]")
+                pattern = " ".join(beat_groups)
+            else:
+                # Fallback for drums without rhythm
+                pattern = self.drum_sound
+
+            # Build drum expression
+            result = f'sound("{pattern}")'
+            result += f'.gain({self.gain})'
+            return result
+
         else:
-            # Fallback: simple grouping
-            pattern = " ".join(f"[{p.to_strudel()}]" for p in self.phrases)
+            # Melodic layer: use n() with scale/effects
+            if self.rhythm and self.phrases:
+                # Use rhythm-aware formatting for each phrase
+                patterns = [p.to_strudel_with_rhythm(self.rhythm, self.use_scale_degrees, chord_mode=self.chord_mode) for p in self.phrases]
+                pattern = " ".join(patterns)
+            else:
+                # Fallback: simple grouping
+                pattern = " ".join(f"[{p.to_strudel()}]" for p in self.phrases)
 
-        # Build Strudel expression
-        result = f'n("{pattern}")'
+            # Build Strudel expression
+            result = f'n("{pattern}")'
 
-        # Add octave shift if specified
-        if self.octave_shift != 0:
-            result += f'.sub({abs(self.octave_shift)})'
+            # Add octave shift if specified
+            if self.octave_shift != 0:
+                result += f'.sub({abs(self.octave_shift)})'
 
-        # Add scale
-        result += f'.scale("{self.scale}")'
+            # Add scale
+            result += f'.scale("{self.scale}")'
 
-        # Add instrument
-        result += f'.s("{self.instrument}")'
+            # Add instrument
+            result += f'.s("{self.instrument}")'
 
-        # Add gain
-        result += f'.gain({self.gain})'
+            # Add gain
+            result += f'.gain({self.gain})'
 
-        # Add low-pass filter
-        if self.lpf:
-            result += f'.lpf({self.lpf})'
+            # Add low-pass filter
+            if self.lpf:
+                result += f'.lpf({self.lpf})'
 
-        return result
+            return result
 
 
 @dataclass
