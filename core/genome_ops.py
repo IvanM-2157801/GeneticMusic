@@ -1,16 +1,15 @@
-"""Genome operations for musical evolution."""
 import random
 from copy import deepcopy
 from .music import Note, NoteName, Phrase, Layer
+
+REST_PROBABILITY = 0.4
 
 
 def random_note(
     scale: list[NoteName] | None = None,
     octave_range: tuple[int, int] = (3, 5),
-    rest_probability: float = 0.1,
 ) -> Note:
-    """Generate a random note."""
-    if random.random() < rest_probability:
+    if random.random() < REST_PROBABILITY:
         return Note(NoteName.REST)
     
     if scale is None:
@@ -26,7 +25,6 @@ def random_note(
 
 
 def random_phrase(length: int, **note_kwargs) -> Phrase:
-    """Generate a random phrase."""
     return Phrase([random_note(**note_kwargs) for _ in range(length)])
 
 
@@ -37,7 +35,6 @@ def random_layer(
     instrument: str = "piano",
     **note_kwargs,
 ) -> Layer:
-    """Generate a random layer."""
     return Layer(
         name=name,
         phrases=[random_phrase(phrase_length, **note_kwargs) for _ in range(phrase_count)],
@@ -48,7 +45,6 @@ def random_layer(
 # === Mutation Operations ===
 
 def mutate_note(note: Note, scale: list[NoteName] | None = None) -> Note:
-    """Mutate a single note."""
     mutation_type = random.choice(["pitch", "octave", "duration", "velocity"])
     new_note = deepcopy(note)
     
@@ -69,7 +65,6 @@ def mutate_note(note: Note, scale: list[NoteName] | None = None) -> Note:
 
 
 def mutate_phrase(phrase: Phrase, mutation_rate: float = 0.1) -> Phrase:
-    """Mutate notes in a phrase."""
     new_notes = []
     for note in phrase.notes:
         if random.random() < mutation_rate:
@@ -80,7 +75,6 @@ def mutate_phrase(phrase: Phrase, mutation_rate: float = 0.1) -> Phrase:
 
 
 def mutate_layer(layer: Layer, mutation_rate: float = 0.1) -> Layer:
-    """Mutate phrases in a layer."""
     return Layer(
         name=layer.name,
         phrases=[mutate_phrase(p, mutation_rate) for p in layer.phrases],
@@ -90,8 +84,8 @@ def mutate_layer(layer: Layer, mutation_rate: float = 0.1) -> Layer:
 
 # === Crossover Operations ===
 
+# TODO: crossover with multiple parents?
 def crossover_phrase(p1: Phrase, p2: Phrase) -> Phrase:
-    """Single-point crossover between two phrases."""
     min_len = min(len(p1.notes), len(p2.notes))
     if min_len < 2:
         return deepcopy(p1)
@@ -101,7 +95,6 @@ def crossover_phrase(p1: Phrase, p2: Phrase) -> Phrase:
 
 
 def crossover_layer(l1: Layer, l2: Layer) -> Layer:
-    """Crossover between two layers."""
     min_phrases = min(len(l1.phrases), len(l2.phrases))
     new_phrases = [
         crossover_phrase(l1.phrases[i], l2.phrases[i])

@@ -1,109 +1,108 @@
-import itertools
 import strudel
-import random
+from core.genetic import GeneticAlgorithm, Individual
+from core.music import Phrase, NoteName
+from core.genome_ops import random_phrase, mutate_phrase, crossover_phrase
 
+# Constants
 BPM = 128
 BARS = 2
 BEATS_PER_BAR = 4
-# NOTES = ["C", "C#", "D", "D#", "Eb", "E", "F", "F#", "Gb", "G", "G#", "Ab", "A", "A#", "B"]
-NOTES = ["0", "1", "2", "3", "4", "5", "6", "7", "~"]
-POPSIZE = 5
-KEEP_SIZE = 4
-assert(POPSIZE > KEEP_SIZE)
+TOTAL_NOTES = BARS * BEATS_PER_BAR
 
-MIXING_NUMBER = 2
-MUTATION_RATE = 0.05
+POPULATION_SIZE = 5
+MUTATION_RATE = 0.2
+CROSSOVER_RATE = 0.8
+ELITISM_COUNT = 2
 
-TOTAL_NOTES=BARS*BEATS_PER_BAR
+# Scale to use (C major)
+SCALE = [NoteName.C, NoteName.D, NoteName.E, NoteName.F, NoteName.G, NoteName.A, NoteName.B]
 
 
-def fitness_score(ind: list[str]):
-    strudel.create_strudel(ind, TOTAL_NOTES)
-    # Wait for user input between 1 and 5
+def phrase_to_strudel_notes(phrase: Phrase) -> list[str]:
+    notes = []
+    for note in phrase.notes:
+        if note.pitch == NoteName.REST:
+            notes.append("~")
+        else:
+            # Convert pitch to scale degree (0-7)
+            if note.pitch in SCALE:
+                degree = SCALE.index(note.pitch)
+                notes.append(str(degree))
+            else:
+                notes.append("0")
+    return notes
+
+
+def user_fitness_fn(phrase: Phrase) -> float:
+    notes = phrase_to_strudel_notes(phrase)
+    strudel.create_strudel(notes, TOTAL_NOTES)
+    
     while True:
         try:
             user_input = int(input("Enter a number between 1 and 6: "))
             if 1 <= user_input <= 6:
-                break
+                return float(user_input)
             else:
                 print("Please enter a valid number between 1 and 6.")
         except ValueError:
             print("Invalid input. Please enter a number.")
-    
-    return user_input
-    
-
-def select_fittest(pop: list[list[str]]) -> tuple[list[list[str]], bool]:
-    fitness = []
-    for ind in pop:
-        score = fitness_score(ind)
-        if score > 5:
-            return [ind], True
-            
-        fitness.append((ind, score))
-        
-    fitness.sort(reverse=True, key=lambda x: x[1])
-    return [x[0] for x in fitness[:KEEP_SIZE]], False
 
 
-def generate_population():
-    individuals = []
-
-    for _ in range(POPSIZE):
-        ind: list = []
-        for _ in range(BARS):
-            for _ in range(BEATS_PER_BAR):
-                ind.append(random.choice(NOTES))
-                
-        individuals.append(ind)
-    return individuals
-                
-
-def crossover(parents):
-    cross_points = random.sample(range(TOTAL_NOTES), MIXING_NUMBER - 1)
-    cross_points.sort()
-    offsprings = []
-    permutations = list(itertools.permutations(parents, MIXING_NUMBER))
-    
-    for perm in permutations:
-        offspring = []
-        start_pt = 0
-        
-        for parent_idx, cross_point in enumerate(cross_points):
-            parent_part = perm[parent_idx][start_pt:cross_point]
-            offspring.append(parent_part)
-            start_pt = cross_point
-            
-        last_parent = perm[-1]
-        parent_part = last_parent[cross_point:]
-        offspring.append(parent_part)
-        offsprings.append(list(itertools.chain(*offspring)))
-    
-    return offsprings
+def mutate_fn(phrase: Phrase) -> Phrase:
+    return mutate_phrase(phrase, mutation_rate=MUTATION_RATE)
 
 
-def mutate(seq):
-    for row in range(len(seq)):
-        if random.random() < MUTATION_RATE:
-            seq[row] = random.choice(NOTES)
-    return seq
-        
+def crossover_fn(p1: Phrase, p2: Phrase) -> Phrase:
+    return crossover_phrase(p1, p2)
+
+
+def generate_initial_population() -> list[Individual[Phrase]]:
+    return [
+        Individual(random_phrase(
+            length=TOTAL_NOTES,
+            scale=SCALE,
+            octave_range=(4, 5),
+            rest_probability=0.1,
+        ))
+        for _ in range(POPULATION_SIZE)
+    ]
+
 
 def main():
-    idx = 0
-    pop = generate_population()
+    ga = GeneticAlgorithm[Phrase](
+        population_size=POPULATION_SIZE,
+        mutation_rate=MUTATION_RATE,
+        crossover_rate=CROSSOVER_RATE,
+        elitism_count=ELITISM_COUNT,
+    )
+    
+    population = generate_initial_population()
+    generation = 0
+    
     while True:
-        print("POPULATION SIZE", len(pop))
-        print(idx)
-        best_individuals, solution = select_fittest(pop)
+        print(f"\n=== Generation {generation} ===")
+        print(f"Population size: {len(population)}")
+        
+        # Evolve one generation
+        population = ga.evolve(
+            population=population,
+            fitness_fn=user_fitness_fn,
+            mutate_fn=mutate_fn,
+            crossover_fn=crossover_fn,
+        )
 
-        if solution:
-            strudel.create_strudel(best_individuals[0], TOTAL_NOTES)
+        # population is sorted by fitness after evolve
+        best = population[0]
+        print(f"Best fitness: {best.fitness}")
+        
+        if best.fitness >= 6:
+            print("\n🎵 Found a satisfying melody!")
+            notes = phrase_to_strudel_notes(best.genome)
+            strudel.create_strudel(notes, TOTAL_NOTES)
             break
         
-        offspring = crossover(best_individuals)
-        pop = [mutate(o) for o in offspring]
-        idx += 1
-    
+        generation += 1
+
+
 if __name__ == "__main__":
     main()

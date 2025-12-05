@@ -1,5 +1,3 @@
-"""Core genetic algorithm implementation."""
-from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import TypeVar, Generic, Callable
 import random
@@ -9,14 +7,11 @@ T = TypeVar("T")
 
 @dataclass
 class Individual(Generic[T]):
-    """Wrapper for a genome with its fitness score."""
     genome: T
     fitness: float = 0.0
 
 
 class GeneticAlgorithm(Generic[T]):
-    """Generic genetic algorithm engine."""
-
     def __init__(
         self,
         population_size: int,
@@ -36,7 +31,6 @@ class GeneticAlgorithm(Generic[T]):
         mutate_fn: Callable[[T], T],
         crossover_fn: Callable[[T, T], T],
     ) -> list[Individual[T]]:
-        """Run one generation of evolution."""
         # Evaluate fitness
         for ind in population:
             ind.fitness = fitness_fn(ind.genome)
@@ -52,6 +46,7 @@ class GeneticAlgorithm(Generic[T]):
             parent1 = self._select(population)
             parent2 = self._select(population)
 
+            # random chance to use combined genome or genome of parent1
             if random.random() < self.crossover_rate:
                 child_genome = crossover_fn(parent1.genome, parent2.genome)
             else:
@@ -65,7 +60,6 @@ class GeneticAlgorithm(Generic[T]):
         return new_population
 
     def _select(self, population: list[Individual[T]]) -> Individual[T]:
-        """Tournament selection."""
         tournament_size = 3
         contestants = random.sample(population, min(tournament_size, len(population)))
         return max(contestants, key=lambda x: x.fitness)
