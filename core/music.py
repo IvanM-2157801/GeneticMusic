@@ -242,6 +242,8 @@ class Layer:
     layer_role: str = "melody"
     # Context group - layers with the same group name share context during evolution
     context_group: str = ""
+    # Sound bank for Strudel (e.g., "RolandTR808", "alesissr16")
+    bank: str = ""
 
     def _build_effects_chain(self) -> str:
         """Build the effects chain for Strudel output."""
@@ -320,6 +322,9 @@ class Layer:
             # Build drum expression
             result = f'sound("{pattern}")'
             result += self._build_effects_chain()
+            # Add bank if specified
+            if self.bank:
+                result += f'.bank("{self.bank}")'
             return result
 
         elif self.is_chord_layer and self.chord_progression:

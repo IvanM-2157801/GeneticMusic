@@ -76,6 +76,8 @@ class LayerConfig:
     # Drum parameters
     is_drum: bool = False  # If True, only evolves rhythm (no melody)
     drum_sound: str = ""  # Drum sound name (e.g., "bd", "hh", "sd")
+    # Sound bank for Strudel (e.g., "RolandTR808", "alesissr16")
+    bank: str = ""
     # Chord parameters
     is_chord_layer: bool = (
         False  # If True, evolves chord progressions instead of melody
@@ -319,6 +321,19 @@ class LayeredComposer:
         if verbose:
             print(f"✓ Final melody fitness: {best_fitness:.4f}")
 
+            # Log detailed fitness breakdown if using contextual fitness
+            from fitness.contextual import ContextualFitness
+            if isinstance(contextual_fitness, ContextualFitness):
+                best_layer = Layer(
+                    name=config.name,
+                    phrases=[best_phrase],
+                    instrument=config.instrument,
+                    rhythm=rhythm,
+                    is_drum=config.is_drum,
+                )
+                details = contextual_fitness.evaluate_detailed(best_layer)
+                self._log_fitness_breakdown(config.name, details)
+
         # Store as theme for potential variation development
         if config.name not in self.themes:
             self.themes[config.name] = best_phrase
@@ -549,6 +564,7 @@ class LayeredComposer:
                         drum_sound=config.drum_sound,
                         layer_role=config.layer_role,
                         context_group=config.context_group,
+                        bank=config.bank,
                     )
                     layers.append(layer)
 
@@ -589,6 +605,7 @@ class LayeredComposer:
                         chord_progression=chord_progression.chords,
                         layer_role=config.layer_role,
                         context_group=config.context_group,
+                        bank=config.bank,
                     )
                     layers.append(layer)
 
@@ -630,10 +647,31 @@ class LayeredComposer:
                         base_octave=config.base_octave,
                         layer_role=config.layer_role,
                         context_group=config.context_group,
+                        bank=config.bank,
                     )
                     layers.append(layer)
 
         return Composition(layers=layers, bpm=bpm)
+
+    def _log_fitness_breakdown(self, layer_name: str, details: dict) -> None:
+        """Log detailed fitness breakdown for a layer."""
+        print(f"\n  ─── Fitness Breakdown for '{layer_name}' ───")
+        print(f"  Intrinsic score:  {details['intrinsic_score']:.4f} (weight: 0.7)")
+        print(f"  Context score:    {details['context_score']:.4f} (weight: 0.3)")
+        print(f"  Final score:      {details['final_score']:.4f}")
+
+        if details["metric_scores"]:
+            print(f"\n  Context Metrics (averaged across context layers):")
+            for metric, (score, weight) in details["metric_scores"].items():
+                bar = "█" * int(score * 10) + "░" * (10 - int(score * 10))
+                print(f"    {metric:<15} {bar} {score:.3f} (w={weight:.2f})")
+
+        if details["per_layer_scores"]:
+            print(f"\n  Per-Layer Context Scores:")
+            for context_layer_name, scores in details["per_layer_scores"].items():
+                if scores:
+                    score_strs = [f"{m}={s:.2f}" for m, s in scores.items()]
+                    print(f"    vs {context_layer_name}: {', '.join(score_strs)}")
 
     def print_summary(self) -> None:
         """Print a summary of all evolved layers."""

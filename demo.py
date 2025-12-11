@@ -36,6 +36,13 @@ from fitness.rhythm import (
     rhythm_consistency,
     rhythm_offbeat_emphasis,
 )
+from fitness.drums import (
+    strong_beat_emphasis,
+    backbeat_emphasis,
+    sparsity,
+    simplicity,
+    offbeat_pattern,
+)
 from fitness.chords import (
     ChordFitnessFunction,
     chord_variety,
@@ -203,6 +210,64 @@ def make_chord_fitness(weights: dict[str, float]):
     return CustomChordFitness()
 
 
+def make_drum_fitness(weights: dict[str, float]):
+    """Create a drum rhythm fitness function from a dictionary of weights.
+
+    Available metrics (all return 0.0-1.0):
+        strong_beat  - emphasis on beats 1 & 5 (downbeat, kick-like)
+        backbeat     - emphasis on beats 3 & 7 (snare position)
+        sparse       - inverse of density (more space)
+        simple       - ratio of single hits vs subdivisions
+        offbeat      - offbeat emphasis (syncopated hats)
+        density      - notes per beat (busy)
+        consistency  - pattern repetition (steady)
+
+    Example:
+        kick_fitness = make_drum_fitness({
+            'strong_beat': 0.5,  # Hit on 1 and 5
+            'sparse': 0.3,       # Not too busy
+            'simple': 0.2,       # Single hits
+        })
+
+        hihat_fitness = make_drum_fitness({
+            'density': 0.5,      # Busy
+            'consistency': 0.3,  # Steady pattern
+            'offbeat': 0.2,      # Some offbeat feel
+        })
+
+        snare_fitness = make_drum_fitness({
+            'backbeat': 0.6,     # Hit on 2 and 4
+            'sparse': 0.3,       # Not too busy
+            'simple': 0.1,       # Single hits
+        })
+    """
+    metric_fns = {
+        "strong_beat": strong_beat_emphasis,
+        "backbeat": backbeat_emphasis,
+        "sparse": sparsity,
+        "simple": simplicity,
+        "offbeat": offbeat_pattern,
+        "density": rhythm_density,
+        "consistency": rhythm_consistency,
+    }
+
+    def fitness(rhythm: str) -> float:
+        score = 0.0
+        total_weight = 0.0
+        for metric, weight in weights.items():
+            if metric in metric_fns:
+                fn = metric_fns[metric]
+                value = fn(rhythm)
+                if weight < 0:
+                    score += abs(weight) * (1 - value)
+                else:
+                    score += weight * value
+                total_weight += abs(weight)
+        return score / total_weight if total_weight > 0 else 0.5
+
+    return fitness
+
+
 def make_contextual_weights(weights: dict[str, float]) -> dict[str, float]:
     """Create contextual fitness weights for inter-layer scoring.
 
@@ -287,8 +352,8 @@ verse_melody = make_melody_fitness(
 # More expressive melody for chorus
 chorus_melody = make_melody_fitness(
     {
-        "variety": 0.4,
-        "smoothness": 0.3,  # Allow more jumps
+        "variety": 0.8,
+        "smoothness": 0.3,
         "scale": 0.4,
         "rests": -0.3,
     },
@@ -302,6 +367,37 @@ main_chords = make_chord_fitness(
         "resolution": 0.3,
         "smooth": 0.2,
         "triads": 0.1,
+    }
+)
+
+# =============================================================================
+# DRUM FITNESS FUNCTIONS
+# =============================================================================
+
+# Kick drum: strong beats (1 & 5), sparse, powerful single hits
+kick_fitness = make_drum_fitness(
+    {
+        "strong_beat": 0.5,  # Hit on beats 1 and 5
+        "sparse": 0.3,  # Keep it simple, not too busy
+        "simple": 0.2,  # Single hits, no rolls
+    }
+)
+
+# Hi-hat: busy, consistent, steady groove
+hihat_fitness = make_drum_fitness(
+    {
+        "density": 0.4,  # Keep it busy
+        "consistency": 0.4,  # Steady pattern
+        "offbeat": 0.2,  # Some offbeat feel
+    }
+)
+
+# Snare: backbeat emphasis (2 & 4), sparse accents
+snare_fitness = make_drum_fitness(
+    {
+        "backbeat": 0.6,  # Hit on beats 3 and 7 (2 & 4 in 4/4)
+        "sparse": 0.3,  # Not too busy
+        "simple": 0.1,  # Single hits
     }
 )
 
@@ -414,6 +510,62 @@ def create_layers():
         )
     )
 
+    # --- DRUM LAYERS ---
+    # Drums are global (empty context_group) so they play with all sections
+    # Using "RolandTR808" bank for classic drum machine sounds
+    # Other good banks: "alesissr16", "RhythmAce", "AkaiLinn"
+
+    layers.append(
+        LayerConfig(
+            name="kick",
+            instrument="bd",  # bass drum
+            bars=BARS,
+            beats_per_bar=BEATS_PER_BAR * 2,  # 8 beats for more control
+            max_subdivision=1,  # Single hits only
+            is_drum=True,
+            drum_sound="bd",
+            rhythm_fitness_fn=kick_fitness,
+            layer_role="drums",
+            context_group="",  # Global - plays with all sections
+            gain=0.8,
+            bank="alesissr16",
+        )
+    )
+
+    layers.append(
+        LayerConfig(
+            name="hihat",
+            instrument="hh",  # hi-hat
+            bars=BARS,
+            beats_per_bar=BEATS_PER_BAR * 2,  # 8 beats
+            max_subdivision=2,  # Allow some subdivisions
+            is_drum=True,
+            drum_sound="hh",
+            rhythm_fitness_fn=hihat_fitness,
+            layer_role="drums",
+            context_group="",
+            gain=0.5,
+            bank="alesissr16",
+        )
+    )
+
+    layers.append(
+        LayerConfig(
+            name="snare",
+            instrument="sd",  # snare drum
+            bars=BARS,
+            beats_per_bar=BEATS_PER_BAR * 2,  # 8 beats
+            max_subdivision=1,  # Single hits
+            is_drum=True,
+            drum_sound="sd",
+            rhythm_fitness_fn=snare_fitness,
+            layer_role="drums",
+            context_group="",
+            gain=0.7,
+            bank="alesissr16",
+        )
+    )
+
     # # # --- CHORUS SECTION ---
     layers.append(
         LayerConfig(
@@ -435,23 +587,23 @@ def create_layers():
         )
     )
 
-    # layers.append(
-    #     LayerConfig(
-    #         name="chorus_bass",
-    #         instrument="sawtooth",
-    #         bars=BARS,
-    #         beats_per_bar=BEATS_PER_BAR,
-    #         max_subdivision=2,  # More active bass in chorus
-    #         octave_range=(2, 3),
-    #         base_octave=3,
-    #         rhythm_fitness_fn=chorus_rhythm,
-    #         melody_fitness_fn=verse_melody,
-    #         layer_role="bass",
-    #         context_group="chorus",
-    #         gain=0.4,
-    #         lpf=250,
-    #     )
-    # )
+    layers.append(
+        LayerConfig(
+            name="chorus_bass",
+            instrument="sawtooth",
+            bars=BARS,
+            beats_per_bar=BEATS_PER_BAR,
+            max_subdivision=2,  # More active bass in chorus
+            octave_range=(2, 3),
+            base_octave=3,
+            rhythm_fitness_fn=chorus_rhythm,
+            melody_fitness_fn=verse_melody,
+            layer_role="bass",
+            context_group="chorus",
+            gain=0.4,
+            lpf=250,
+        )
+    )
 
     return layers
 

@@ -91,6 +91,129 @@ class ContextualFitness(FitnessFunction):
             self.context_weight * context_score
         )
 
+    def evaluate_detailed(self, layer: Layer) -> dict:
+        """Evaluate layer and return detailed score breakdown.
+
+        Returns a dict with:
+            - intrinsic_score: float (0.0-1.0)
+            - context_score: float (0.0-1.0)
+            - final_score: float (weighted combination)
+            - metric_scores: dict of metric_name -> (score, weight)
+            - per_layer_scores: dict of layer_name -> {metric: score}
+        """
+        # Get intrinsic fitness
+        if self.intrinsic_fitness:
+            intrinsic_score = self.intrinsic_fitness.evaluate(layer)
+        else:
+            intrinsic_score = 0.5
+
+        result = {
+            "intrinsic_score": intrinsic_score,
+            "context_score": 0.5,
+            "final_score": intrinsic_score,
+            "metric_scores": {},
+            "per_layer_scores": {},
+        }
+
+        # If no context, just return intrinsic score
+        if not self.context_layers:
+            return result
+
+        # Calculate detailed contextual fitness
+        context_score, metric_scores, per_layer_scores = self._evaluate_context_fit_detailed(layer)
+
+        final_score = (
+            self.intrinsic_weight * intrinsic_score +
+            self.context_weight * context_score
+        )
+
+        result["context_score"] = context_score
+        result["final_score"] = final_score
+        result["metric_scores"] = metric_scores
+        result["per_layer_scores"] = per_layer_scores
+
+        return result
+
+    def _evaluate_context_fit_detailed(self, layer: Layer) -> tuple[float, dict, dict]:
+        """Evaluate context fit and return detailed breakdown.
+
+        Returns:
+            - context_score: float (0.0-1.0)
+            - metric_scores: dict of metric_name -> (avg_score, weight)
+            - per_layer_scores: dict of layer_name -> {metric: score}
+        """
+        if not layer.rhythm and not layer.phrases:
+            return 0.5, {}, {}
+
+        scores = {
+            "rhythmic": [],
+            "density": [],
+            "harmonic": [],
+            "voice_leading": [],
+            "call_response": [],
+        }
+
+        per_layer_scores = {}
+
+        # Compare with each context layer
+        for context_layer, context_rhythm in self.context_layers:
+            layer_name = context_layer.name
+            per_layer_scores[layer_name] = {}
+
+            # Rhythmic compatibility
+            if layer.rhythm and context_rhythm:
+                rhythm_score = self._rhythmic_compatibility(layer.rhythm, context_rhythm)
+                scores["rhythmic"].append(rhythm_score)
+                per_layer_scores[layer_name]["rhythmic"] = rhythm_score
+
+                # Check for call-and-response patterns
+                cr_score = self._call_response_pattern(layer.rhythm, context_rhythm)
+                scores["call_response"].append(cr_score)
+                per_layer_scores[layer_name]["call_response"] = cr_score
+
+            # Density balance
+            if layer.rhythm and context_rhythm:
+                density_score = self._density_balance(layer.rhythm, context_rhythm)
+                scores["density"].append(density_score)
+                per_layer_scores[layer_name]["density"] = density_score
+
+            # Melodic layer interactions
+            if not layer.is_drum and not context_layer.is_drum:
+                if layer.phrases and context_layer.phrases:
+                    harmonic_score = self._harmonic_compatibility(
+                        layer.phrases[0], context_layer.phrases[0]
+                    )
+                    scores["harmonic"].append(harmonic_score)
+                    per_layer_scores[layer_name]["harmonic"] = harmonic_score
+
+                    vl_score = self._voice_leading_quality(
+                        layer.phrases[0], context_layer.phrases[0]
+                    )
+                    scores["voice_leading"].append(vl_score)
+                    per_layer_scores[layer_name]["voice_leading"] = vl_score
+
+            # Special case: bass supporting melody
+            if self._is_bass_melody_pair(layer, context_layer):
+                bass_support = self._bass_melody_support(layer, context_layer)
+                scores["harmonic"].append(bass_support)
+                per_layer_scores[layer_name]["bass_melody_support"] = bass_support
+
+        # Calculate weighted average of all scores
+        final_score = 0.0
+        total_weight = 0.0
+        metric_scores = {}
+
+        for metric, metric_score_list in scores.items():
+            if metric_score_list:
+                avg_score = sum(metric_score_list) / len(metric_score_list)
+                weight = self.metric_weights.get(metric, 0.1)
+                final_score += avg_score * weight
+                total_weight += weight
+                metric_scores[metric] = (avg_score, weight)
+
+        final_context_score = final_score / total_weight if total_weight > 0 else 0.5
+        return final_context_score, metric_scores, per_layer_scores
+
     def _evaluate_context_fit(self, layer: Layer) -> float:
         """Evaluate how well this layer fits with context layers."""
         if not layer.rhythm and not layer.phrases:
