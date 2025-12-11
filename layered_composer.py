@@ -45,8 +45,29 @@ class LayerConfig:
     # Strudel parameters
     strudel_scale: str = ""  # e.g., "c:minor" - if empty, will be set randomly
     octave_shift: int = 0  # e.g., -7 for .sub(7)
-    gain: float = 0.5
-    lpf: int = 4000
+    # Basic effects
+    gain: float = 0.5  # Volume (0.0-1.0)
+    lpf: int = 4000  # Low-pass filter (Hz, 0 = disabled)
+    hpf: int = 0  # High-pass filter (Hz, 0 = disabled)
+    # Post effects
+    postgain: float = 0.0  # Volume after effects (0.0 = disabled)
+    # Reverb
+    room: float = 0.0  # Reverb amount (0.0-1.0, 0 = disabled)
+    roomsize: float = 2.0  # Reverb size (0.0-10.0)
+    # Delay
+    delay: float = 0.0  # Delay send (0.0-1.0, 0 = disabled)
+    delaytime: float = 0.25  # Delay time (in cycles)
+    delayfeedback: float = 0.5  # Delay feedback (0.0-0.9)
+    # Distortion
+    distort: float = 0.0  # Distortion amount (0.0-10.0, 0 = disabled)
+    # Panning
+    pan: float = 0.5  # Stereo pan (0=left, 0.5=center, 1=right)
+    # Envelope (ADSR)
+    attack: float = 0.0  # Attack time (0 = disabled)
+    decay: float = 0.0  # Decay time (0 = disabled)
+    sustain: float = 0.0  # Sustain level (0 = disabled)
+    release: float = 0.0  # Release time (0 = disabled)
+    # Other
     use_scale_degrees: bool = True  # Use 0-7 scale degrees
     chord_mode: bool = False  # Use comma-separated notes for chords
     # Drum parameters
@@ -500,6 +521,16 @@ class LayeredComposer:
                         instrument=config.instrument,
                         rhythm=rhythm,
                         gain=config.gain,
+                        lpf=config.lpf,
+                        hpf=config.hpf,
+                        postgain=config.postgain,
+                        room=config.room,
+                        roomsize=config.roomsize,
+                        delay=config.delay,
+                        delaytime=config.delaytime,
+                        delayfeedback=config.delayfeedback,
+                        distort=config.distort,
+                        pan=config.pan,
                         is_drum=True,
                         drum_sound=config.drum_sound,
                     )
@@ -525,6 +556,19 @@ class LayeredComposer:
                         octave_shift=config.octave_shift,
                         gain=config.gain,
                         lpf=config.lpf,
+                        hpf=config.hpf,
+                        postgain=config.postgain,
+                        room=config.room,
+                        roomsize=config.roomsize,
+                        delay=config.delay,
+                        delaytime=config.delaytime,
+                        delayfeedback=config.delayfeedback,
+                        distort=config.distort,
+                        pan=config.pan,
+                        attack=config.attack,
+                        decay=config.decay,
+                        sustain=config.sustain,
+                        release=config.release,
                         is_chord_layer=True,
                         chord_progression=chord_progression.chords,
                     )
@@ -550,6 +594,19 @@ class LayeredComposer:
                         octave_shift=config.octave_shift,
                         gain=config.gain,
                         lpf=config.lpf,
+                        hpf=config.hpf,
+                        postgain=config.postgain,
+                        room=config.room,
+                        roomsize=config.roomsize,
+                        delay=config.delay,
+                        delaytime=config.delaytime,
+                        delayfeedback=config.delayfeedback,
+                        distort=config.distort,
+                        pan=config.pan,
+                        attack=config.attack,
+                        decay=config.decay,
+                        sustain=config.sustain,
+                        release=config.release,
                         use_scale_degrees=config.use_scale_degrees,
                         chord_mode=config.chord_mode,
                     )

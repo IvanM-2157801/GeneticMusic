@@ -38,9 +38,23 @@ SCALE_INTERVALS = {
 
 # Map note names to semitone values
 NOTE_NAME_TO_SEMITONE = {
-    "c": 0, "cs": 1, "db": 1, "d": 2, "ds": 3, "eb": 3,
-    "e": 4, "f": 5, "fs": 6, "gb": 6, "g": 7, "gs": 8,
-    "ab": 8, "a": 9, "as": 10, "bb": 10, "b": 11,
+    "c": 0,
+    "cs": 1,
+    "db": 1,
+    "d": 2,
+    "ds": 3,
+    "eb": 3,
+    "e": 4,
+    "f": 5,
+    "fs": 6,
+    "gb": 6,
+    "g": 7,
+    "gs": 8,
+    "ab": 8,
+    "a": 9,
+    "as": 10,
+    "bb": 10,
+    "b": 11,
 }
 
 
@@ -120,7 +134,13 @@ class Phrase:
     def to_strudel(self) -> str:
         return " ".join(n.to_strudel() for n in self.notes)
 
-    def to_strudel_with_rhythm(self, rhythm: str, scale_degrees: bool = False, drum_sound: str = None, chord_mode: bool = False) -> str:
+    def to_strudel_with_rhythm(
+        self,
+        rhythm: str,
+        scale_degrees: bool = False,
+        drum_sound: str = None,
+        chord_mode: bool = False,
+    ) -> str:
         """Convert phrase to Strudel notation preserving rhythm structure.
 
         Example: rhythm "2103" with 6 notes becomes "[n1 n2] [n3] ~ [n4 n5 n6]"
@@ -179,14 +199,85 @@ class Layer:
     rhythm: str = ""  # Store rhythm pattern for proper Strudel output
     scale: str = "c:major"  # Scale specification (e.g., "c:minor", "d:major")
     octave_shift: int = 0  # Octave transposition (e.g., -7 for .sub(7))
-    gain: float = 0.5  # Volume/gain
-    lpf: int = 4000  # Low-pass filter frequency
+    # Basic effects
+    gain: float = 0.5  # Volume/gain (0.0-1.0)
+    lpf: int = 4000  # Low-pass filter frequency (Hz, 0 = disabled)
+    hpf: int = 0  # High-pass filter frequency (Hz, 0 = disabled)
+    # Post effects
+    postgain: float = 0.0  # Volume after effects (0.0 = disabled)
+    # Reverb
+    room: float = 0.0  # Reverb amount (0.0-1.0, 0 = disabled)
+    roomsize: float = 2.0  # Reverb size (0.0-10.0)
+    # Delay
+    delay: float = 0.0  # Delay send (0.0-1.0, 0 = disabled)
+    delaytime: float = 0.25  # Delay time (in cycles)
+    delayfeedback: float = 0.5  # Delay feedback (0.0-0.9)
+    # Distortion
+    distort: float = 0.0  # Distortion amount (0.0-10.0, 0 = disabled)
+    # Panning
+    pan: float = 0.5  # Stereo pan (0.0=left, 0.5=center, 1.0=right)
+    # Envelope
+    attack: float = 0.0  # Attack time (0 = disabled)
+    decay: float = 0.0  # Decay time (0 = disabled)
+    sustain: float = 0.0  # Sustain level (0 = disabled)
+    release: float = 0.0  # Release time (0 = disabled)
+    # Layer type flags
     use_scale_degrees: bool = True  # Use scale degrees 0-7 instead of note names
     is_drum: bool = False  # If True, uses sound() instead of n()
     drum_sound: str = ""  # Drum sound name (e.g., "bd", "hh", "sd")
     chord_mode: bool = False  # If True, uses comma-separated notes for chords
     chord_progression: list = field(default_factory=list)  # List of Chord objects
-    is_chord_layer: bool = False  # If True, this layer plays chords from chord_progression
+    is_chord_layer: bool = (
+        False  # If True, this layer plays chords from chord_progression
+    )
+
+    def _build_effects_chain(self) -> str:
+        """Build the effects chain for Strudel output."""
+        effects = []
+
+        # Gain (always add)
+        effects.append(f".gain({self.gain})")
+
+        # Filters
+        if self.lpf:
+            effects.append(f".lpf({self.lpf})")
+        if self.hpf:
+            effects.append(f".hpf({self.hpf})")
+
+        # Envelope (ADSR)
+        if self.attack > 0:
+            effects.append(f".attack({self.attack})")
+        if self.decay > 0:
+            effects.append(f".decay({self.decay})")
+        if self.sustain > 0:
+            effects.append(f".sustain({self.sustain})")
+        if self.release > 0:
+            effects.append(f".release({self.release})")
+
+        # Distortion
+        if self.distort > 0:
+            effects.append(f".distort({self.distort})")
+
+        # Panning (only add if not center)
+        if self.pan != 0.5:
+            effects.append(f".pan({self.pan})")
+
+        # Reverb
+        if self.room > 0:
+            effects.append(f".room({self.room})")
+            effects.append(f".roomsize({self.roomsize})")
+
+        # Delay
+        if self.delay > 0:
+            effects.append(f".delay({self.delay})")
+            effects.append(f".delaytime({self.delaytime})")
+            effects.append(f".delayfeedback({self.delayfeedback})")
+
+        # Post-gain (after effects)
+        if self.postgain > 0:
+            effects.append(f".postgain({self.postgain})")
+
+        return "".join(effects)
 
     def to_strudel(self) -> str:
         """Convert layer to Strudel notation.
@@ -206,7 +297,9 @@ class Layer:
                     elif subdivisions == 1:
                         beat_groups.append(self.drum_sound)
                     else:
-                        beat_groups.append("[" + " ".join([self.drum_sound] * subdivisions) + "]")
+                        beat_groups.append(
+                            "[" + " ".join([self.drum_sound] * subdivisions) + "]"
+                        )
                 pattern = " ".join(beat_groups)
             else:
                 # Fallback for drums without rhythm
@@ -214,7 +307,7 @@ class Layer:
 
             # Build drum expression
             result = f'sound("{pattern}")'
-            result += f'.gain({self.gain})'
+            result += self._build_effects_chain()
             return result
 
         elif self.is_chord_layer and self.chord_progression:
@@ -227,26 +320,22 @@ class Layer:
             else:
                 result = f'n("{pattern}")'
 
-            # Add scale
+            # Add scale and instrument
             result += f'.scale("{self.scale}")'
-
-            # Add instrument
             result += f'.s("{self.instrument}")'
-
-            # Add gain
-            result += f'.gain({self.gain})'
-
-            # Add low-pass filter
-            if self.lpf:
-                result += f'.lpf({self.lpf})'
-
+            result += self._build_effects_chain()
             return result
 
         else:
             # Melodic layer: use n() with scale/effects
             if self.rhythm and self.phrases:
                 # Use rhythm-aware formatting for each phrase
-                patterns = [p.to_strudel_with_rhythm(self.rhythm, self.use_scale_degrees, chord_mode=self.chord_mode) for p in self.phrases]
+                patterns = [
+                    p.to_strudel_with_rhythm(
+                        self.rhythm, self.use_scale_degrees, chord_mode=self.chord_mode
+                    )
+                    for p in self.phrases
+                ]
                 pattern = " ".join(patterns)
             else:
                 # Fallback: simple grouping
@@ -258,19 +347,10 @@ class Layer:
             else:
                 result = f'n("{pattern}")'
 
-            # Add scale
+            # Add scale and instrument
             result += f'.scale("{self.scale}")'
-
-            # Add instrument
             result += f'.s("{self.instrument}")'
-
-            # Add gain
-            result += f'.gain({self.gain})'
-
-            # Add low-pass filter
-            if self.lpf:
-                result += f'.lpf({self.lpf})'
-
+            result += self._build_effects_chain()
             return result
 
     def _chord_progression_to_strudel(self) -> str:
@@ -313,6 +393,7 @@ class HarmonicContext:
     This provides context for melody fitness functions to evaluate how well
     melody notes fit with the underlying harmony.
     """
+
     chord_progression: "ChordProgression"
     beats_per_chord: int = 4  # How many beats each chord lasts
     scale_root: str = "c"  # Root note of the scale (e.g., "c", "g", "f#")
@@ -330,7 +411,9 @@ class HarmonicContext:
         if not self.chord_progression.chords:
             return None
         chord_idx = beat // self.beats_per_chord
-        return self.chord_progression.chords[chord_idx % len(self.chord_progression.chords)]
+        return self.chord_progression.chords[
+            chord_idx % len(self.chord_progression.chords)
+        ]
 
     def get_chord_tones_at_beat(self, beat: int) -> list[int]:
         """Get the chord tones (as semitone intervals from scale root) at a beat.
@@ -419,7 +502,10 @@ class DynamicEnvelope:
 
     Used for evolving volume automation (crescendos, diminuendos, etc.)
     """
-    points: list[tuple[float, float]] = field(default_factory=list)  # (time_fraction, gain_value)
+
+    points: list[tuple[float, float]] = field(
+        default_factory=list
+    )  # (time_fraction, gain_value)
     envelope_type: str = "linear"  # "linear", "smooth", "step"
 
     def __post_init__(self):
@@ -487,7 +573,10 @@ class FilterEnvelope:
 
     Used for evolving filter automation (sweeps, opens, etc.)
     """
-    points: list[tuple[float, float]] = field(default_factory=list)  # (time_fraction, cutoff_hz)
+
+    points: list[tuple[float, float]] = field(
+        default_factory=list
+    )  # (time_fraction, cutoff_hz)
     envelope_type: str = "linear"  # "linear", "smooth", "step"
 
     def __post_init__(self):
@@ -549,7 +638,9 @@ class Composition:
     layers: list[Layer] = field(default_factory=list)
     bpm: int = 120
     global_scale: str = ""  # If set, overrides individual layer scales
-    harmonic_context: HarmonicContext = None  # Optional harmonic context for the composition
+    harmonic_context: HarmonicContext = (
+        None  # Optional harmonic context for the composition
+    )
 
     def to_strudel(self) -> str:
         lines = [f"setcpm({self.bpm / 4})", ""]  # cpm = cycles per minute
@@ -559,14 +650,16 @@ class Composition:
     def to_strudel_link(self) -> str:
         """Generate a Strudel REPL link for this composition."""
         import base64
+
         strudel_code = self.to_strudel()
-        encoded = base64.b64encode(strudel_code.encode('utf-8')).decode('utf-8')
+        encoded = base64.b64encode(strudel_code.encode("utf-8")).decode("utf-8")
         return f"https://strudel.cc/#{encoded}"
 
     @staticmethod
     def random_scale() -> str:
         """Generate a random scale (e.g., 'c:minor', 'g:major')."""
         import random
-        roots = ['c', 'd', 'e', 'f', 'g', 'a', 'b']
-        modes = ['major', 'minor']
+
+        roots = ["c", "d", "e", "f", "g", "a", "b"]
+        modes = ["major", "minor"]
         return f"{random.choice(roots)}:{random.choice(modes)}"
