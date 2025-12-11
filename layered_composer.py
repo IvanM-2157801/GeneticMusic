@@ -1,9 +1,16 @@
-"""Improved multi-layer composer with separate rhythm and note evolution."""
+"""Improved multi-layer composer with separate rhythm and note evolution.
 
-from dataclasses import dataclass
+Features:
+- Two-phase evolution (rhythm then melody) for each layer
+- Chord-aware melody evolution using HarmonicContext
+- Inter-layer fitness for coherent arrangements
+- Theme tracking for musical development
+"""
+
+from dataclasses import dataclass, field
 from typing import Callable, Optional
 from core.genetic import GeneticAlgorithm, Individual
-from core.music import Phrase, NoteName, Layer, Composition
+from core.music import Phrase, NoteName, Layer, Composition, HarmonicContext
 from core.genome_ops import (
     random_rhythm,
     mutate_rhythm,
@@ -19,6 +26,7 @@ from core.genome_ops import (
 )
 from fitness.base import FitnessFunction
 from fitness.chords import ChordFitnessFunction
+from fitness.harmony import create_harmony_fitness, GENRE_CHORD_STRICTNESS
 
 
 @dataclass
@@ -52,6 +60,12 @@ class LayerConfig:
     notes_per_chord: int = 3  # Number of notes per chord (2=dyad, 3=triad, 4=7th)
     allowed_chord_types: list[str] = None  # e.g., ["major", "minor", "dom7"]
     chord_fitness_fn: ChordFitnessFunction = None  # Takes ChordProgression
+    # Harmony-aware parameters
+    use_harmonic_context: bool = True  # If True, melody fitness considers chords
+    genre: str = "pop"  # Genre for chord-melody strictness (pop, jazz, blues, etc.)
+    harmony_weight: float = 0.4  # Weight for harmonic fitness (0.0-1.0)
+    # Layer role for evolution ordering
+    layer_role: str = "melody"  # "chords", "drums", "bass", "melody", "pad"
 
     def __post_init__(self):
         if self.scale is None:
@@ -71,8 +85,28 @@ class LayerConfig:
         return self.bars * self.beats_per_bar
 
 
+# Layer role priority for evolution order
+# Lower numbers = evolved first (provides context for later layers)
+LAYER_ROLE_PRIORITY = {
+    "chords": 0,    # Harmonic foundation - evolve first
+    "drums": 1,     # Rhythmic foundation
+    "bass": 2,      # Harmonic + rhythmic bridge
+    "melody": 3,    # Main melodic line
+    "pad": 4,       # Harmonic fill
+    "lead": 5,      # Solo/lead line (last, most freedom)
+}
+
+
 class LayeredComposer:
-    """Composer that evolves rhythm and melody separately for each layer."""
+    """Composer that evolves rhythm and melody separately for each layer.
+
+    Features:
+    - Two-phase evolution (rhythm then melody)
+    - Harmonic context for chord-aware melody evolution
+    - Inter-layer fitness for coherent arrangements
+    - Automatic layer ordering based on musical role
+    - Theme storage for musical development
+    """
 
     def __init__(
         self,
@@ -81,8 +115,9 @@ class LayeredComposer:
         elitism_count: int = 6,
         rhythm_generations: int = 20,
         melody_generations: int = 30,
-        chord_generations: int = 25,  # New: generations for chord evolution
+        chord_generations: int = 25,
         use_context: bool = True,  # Enable inter-layer dependencies
+        use_harmonic_context: bool = True,  # Enable chord-aware melody evolution
     ):
         self.population_size = population_size
         self.mutation_rate = mutation_rate
@@ -91,16 +126,23 @@ class LayeredComposer:
         self.melody_generations = melody_generations
         self.chord_generations = chord_generations
         self.use_context = use_context
+        self.use_harmonic_context = use_harmonic_context
 
         self.layer_configs: list[LayerConfig] = []
         self.evolved_rhythms: dict[str, str] = {}  # layer_name -> rhythm string
         self.evolved_phrases: dict[str, Phrase] = {}  # layer_name -> Phrase
-        self.evolved_chords: dict[str, ChordProgression] = (
-            {}
-        )  # layer_name -> ChordProgression
-        self.evolved_layers: dict[str, tuple[Layer, str]] = (
-            {}
-        )  # layer_name -> (Layer, rhythm)
+        self.evolved_chords: dict[str, ChordProgression] = {}  # layer_name -> ChordProgression
+        self.evolved_layers: dict[str, tuple[Layer, str]] = {}  # layer_name -> (Layer, rhythm)
+
+        # Harmonic context (set after chord evolution)
+        self.harmonic_context: Optional[HarmonicContext] = None
+
+        # Theme storage for musical development
+        self.themes: dict[str, Phrase] = {}  # layer_name -> original theme phrase
+
+        # Scale info (set before evolution)
+        self.scale_root: str = "c"
+        self.scale_type: str = "major"
 
     def add_layer(self, config: LayerConfig) -> None:
         """Add a layer configuration."""
@@ -154,11 +196,18 @@ class LayeredComposer:
     def evolve_layer_melody(
         self, config: LayerConfig, rhythm: str, verbose: bool = True
     ) -> Phrase:
-        """Evolve melody for a single layer with fixed rhythm."""
+        """Evolve melody for a single layer with fixed rhythm.
+
+        If harmonic context is available and use_harmonic_context is enabled,
+        the melody fitness will consider how well notes fit the chord progression.
+        """
         if verbose:
             print(f"\n{'='*60}")
             print(f"Evolving melody for layer: {config.name}")
             print(f"Using rhythm: {rhythm}")
+            if self.harmonic_context and self.use_harmonic_context and config.use_harmonic_context:
+                strictness = GENRE_CHORD_STRICTNESS.get(config.genre, 0.6)
+                print(f"Harmonic context: enabled (genre={config.genre}, strictness={strictness:.1f})")
             print(f"{'='*60}")
 
         ga = GeneticAlgorithm[Phrase](
@@ -177,12 +226,29 @@ class LayeredComposer:
             for _ in range(self.population_size)
         ]
 
-        # Evolve with contextual fitness
+        # Build fitness function with optional harmonic awareness
+        base_fitness = config.melody_fitness_fn
+
+        # Add harmonic context if available and enabled
+        if (self.harmonic_context and
+            self.use_harmonic_context and
+            config.use_harmonic_context and
+            base_fitness):
+            # Wrap with harmony-aware fitness
+            harmony_fitness = create_harmony_fitness(
+                intrinsic_fitness=base_fitness,
+                harmonic_context=self.harmonic_context,
+                genre=config.genre,
+                harmony_weight=config.harmony_weight,
+            )
+        else:
+            harmony_fitness = base_fitness
+
+        # Wrap with contextual fitness for inter-layer awareness
         from fitness.contextual import create_contextual_fitness
 
-        # Create contextual fitness that considers already-evolved layers
         contextual_fitness = create_contextual_fitness(
-            intrinsic_fitness=config.melody_fitness_fn,
+            intrinsic_fitness=harmony_fitness,
             evolved_layers=self.evolved_layers,
             use_context=self.use_context,
         )
@@ -223,6 +289,10 @@ class LayeredComposer:
         best_phrase = population[0].genome
         if verbose:
             print(f"✓ Final melody fitness: {best_fitness:.4f}")
+
+        # Store as theme for potential variation development
+        if config.name not in self.themes:
+            self.themes[config.name] = best_phrase
 
         return best_phrase
 
@@ -296,9 +366,40 @@ class LayeredComposer:
 
         return best_progression
 
+    def _get_sorted_configs(self) -> list[LayerConfig]:
+        """Sort layer configs by evolution priority.
+
+        Layers are sorted so that harmonic foundation (chords) comes first,
+        then rhythmic foundation (drums), then harmonic bridge (bass),
+        then melodic layers (melody, pad, lead).
+        """
+        return sorted(
+            self.layer_configs,
+            key=lambda c: LAYER_ROLE_PRIORITY.get(c.layer_role, 3)
+        )
+
     def evolve_all_layers(self, verbose: bool = True) -> None:
-        """Evolve all layers (rhythm then melody/chords for each) with inter-layer dependencies."""
-        for config in self.layer_configs:
+        """Evolve all layers with proper ordering and inter-layer dependencies.
+
+        Evolution order:
+        1. Chord layers (harmonic foundation)
+        2. Drum layers (rhythmic foundation)
+        3. Bass layers (harmonic + rhythmic bridge)
+        4. Melody/Pad/Lead layers (melodic content)
+
+        After chord layers are evolved, harmonic context is established
+        and used for subsequent melodic layer evolution.
+        """
+        # Sort configs by evolution priority
+        sorted_configs = self._get_sorted_configs()
+
+        if verbose:
+            print(f"\n{'#'*60}")
+            print("# EVOLVING LAYERS")
+            print(f"# Order: {' → '.join(c.name for c in sorted_configs)}")
+            print(f"{'#'*60}")
+
+        for config in sorted_configs:
             # Phase 1: Evolve rhythm (for all layer types except pure chord layers)
             if not config.is_chord_layer:
                 rhythm = self.evolve_layer_rhythm(config, verbose=verbose)
@@ -343,6 +444,18 @@ class LayeredComposer:
                     octave_shift=config.octave_shift,
                 )
                 self.evolved_layers[config.name] = (chord_layer, rhythm)
+
+                # Establish harmonic context for subsequent layers
+                if self.use_harmonic_context and not self.harmonic_context:
+                    self.harmonic_context = HarmonicContext(
+                        chord_progression=chord_progression,
+                        beats_per_chord=config.beats_per_bar,  # One chord per bar by default
+                        scale_root=self.scale_root,
+                        scale_type=self.scale_type,
+                    )
+                    if verbose:
+                        print(f"   ↳ Harmonic context established from '{config.name}'")
+
                 if verbose:
                     print(f"✓ Chord layer '{config.name}' complete\n")
 

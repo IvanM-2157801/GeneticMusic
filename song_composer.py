@@ -2,6 +2,13 @@
 
 This module extends the layered composer to support full song structures with
 multiple sections that are each evolved separately using genetic algorithms.
+
+Features:
+- Pre-defined song forms (pop standard, electronic drop, ballad, etc.)
+- Section templates with energy levels and layer assignments
+- Transition types (fill, buildup, breakdown, cut)
+- Dynamic envelopes per section
+- Harmonic context integration
 """
 
 from dataclasses import dataclass, field
@@ -10,7 +17,10 @@ from enum import Enum
 import base64
 
 from core.genetic import GeneticAlgorithm, Individual
-from core.music import Phrase, NoteName, Layer, Composition
+from core.music import (
+    Phrase, NoteName, Layer, Composition,
+    HarmonicContext, DynamicEnvelope, FilterEnvelope,
+)
 from core.genome_ops import (
     random_rhythm,
     mutate_rhythm,
@@ -26,6 +36,7 @@ from core.genome_ops import (
 )
 from fitness.base import FitnessFunction
 from fitness.chords import ChordFitnessFunction
+from fitness.harmony import create_harmony_fitness, GENRE_CHORD_STRICTNESS
 
 
 class SectionType(Enum):
@@ -33,14 +44,152 @@ class SectionType(Enum):
 
     INTRO = "intro"
     VERSE = "verse"
+    PRECHORUS = "prechorus"
     CHORUS = "chorus"
     BRIDGE = "bridge"
+    BREAKDOWN = "breakdown"
+    BUILDUP = "buildup"
+    DROP = "drop"
     OUTRO = "outro"
+
+
+class TransitionType(Enum):
+    """Types of transitions between sections."""
+
+    CUT = "cut"              # Hard transition, all layers change at once
+    FILL = "fill"            # Drum fill at boundary
+    BUILDUP = "buildup"      # Gradual density/filter increase
+    BREAKDOWN = "breakdown"  # Remove layers gradually
+    RISER = "riser"          # Ascending filter sweep
+    IMPACT = "impact"        # Big hit on downbeat
+
+
+class SongForm(Enum):
+    """Pre-defined song structures."""
+
+    POP_STANDARD = "pop_standard"
+    VERSE_CHORUS = "verse_chorus"
+    AABA = "aaba"
+    ELECTRONIC_DROP = "electronic_drop"
+    BALLAD = "ballad"
+    ROCK = "rock"
+    JAZZ_STANDARD = "jazz_standard"
+
+
+@dataclass
+class SectionTemplate:
+    """Template for a song section with all properties."""
+
+    section_type: SectionType
+    bars: int = 4
+    energy: float = 0.5  # 0.0 = low energy, 1.0 = high energy
+    density_modifier: float = 1.0  # Affects rhythm density
+    layers_active: list[str] = None  # Which instruments play (None = all)
+    transition_in: TransitionType = TransitionType.CUT
+    transition_out: TransitionType = TransitionType.CUT
+
+    # Dynamics for this section
+    gain_range: tuple[float, float] = (0.5, 0.7)  # (min, max) gain
+    lpf_range: tuple[float, float] = (3000, 8000)  # (min, max) filter cutoff
+
+    def __post_init__(self):
+        if self.layers_active is None:
+            self.layers_active = []  # Empty means all layers
+
+
+# Pre-defined song forms
+SONG_FORM_TEMPLATES = {
+    SongForm.POP_STANDARD: [
+        SectionTemplate(SectionType.INTRO, bars=4, energy=0.3, gain_range=(0.3, 0.5), lpf_range=(2000, 4000)),
+        SectionTemplate(SectionType.VERSE, bars=8, energy=0.5, gain_range=(0.5, 0.6), lpf_range=(3000, 6000)),
+        SectionTemplate(SectionType.PRECHORUS, bars=4, energy=0.7, gain_range=(0.6, 0.7), lpf_range=(5000, 8000), transition_out=TransitionType.BUILDUP),
+        SectionTemplate(SectionType.CHORUS, bars=8, energy=0.9, gain_range=(0.8, 1.0), lpf_range=(6000, 10000)),
+        SectionTemplate(SectionType.VERSE, bars=8, energy=0.6, gain_range=(0.5, 0.7), lpf_range=(3000, 6000)),
+        SectionTemplate(SectionType.PRECHORUS, bars=4, energy=0.7, gain_range=(0.6, 0.8), lpf_range=(5000, 8000), transition_out=TransitionType.BUILDUP),
+        SectionTemplate(SectionType.CHORUS, bars=8, energy=1.0, gain_range=(0.9, 1.0), lpf_range=(8000, 12000)),
+        SectionTemplate(SectionType.BRIDGE, bars=8, energy=0.4, gain_range=(0.4, 0.6), lpf_range=(2000, 5000), transition_in=TransitionType.BREAKDOWN),
+        SectionTemplate(SectionType.CHORUS, bars=8, energy=1.0, gain_range=(0.9, 1.0), lpf_range=(8000, 12000), transition_in=TransitionType.IMPACT),
+        SectionTemplate(SectionType.OUTRO, bars=4, energy=0.3, gain_range=(0.5, 0.2), lpf_range=(4000, 1000)),
+    ],
+
+    SongForm.VERSE_CHORUS: [
+        SectionTemplate(SectionType.INTRO, bars=4, energy=0.3, gain_range=(0.3, 0.5)),
+        SectionTemplate(SectionType.VERSE, bars=8, energy=0.5, gain_range=(0.5, 0.6)),
+        SectionTemplate(SectionType.CHORUS, bars=8, energy=0.9, gain_range=(0.8, 1.0)),
+        SectionTemplate(SectionType.VERSE, bars=8, energy=0.6, gain_range=(0.5, 0.7)),
+        SectionTemplate(SectionType.CHORUS, bars=8, energy=1.0, gain_range=(0.9, 1.0)),
+        SectionTemplate(SectionType.OUTRO, bars=4, energy=0.3, gain_range=(0.5, 0.2)),
+    ],
+
+    SongForm.AABA: [
+        SectionTemplate(SectionType.VERSE, bars=8, energy=0.6, gain_range=(0.6, 0.7)),  # A
+        SectionTemplate(SectionType.VERSE, bars=8, energy=0.7, gain_range=(0.6, 0.8)),  # A
+        SectionTemplate(SectionType.BRIDGE, bars=8, energy=0.5, gain_range=(0.5, 0.6)),  # B
+        SectionTemplate(SectionType.VERSE, bars=8, energy=0.8, gain_range=(0.7, 0.9)),  # A
+    ],
+
+    SongForm.ELECTRONIC_DROP: [
+        SectionTemplate(SectionType.INTRO, bars=8, energy=0.2, gain_range=(0.2, 0.4), lpf_range=(1000, 3000)),
+        SectionTemplate(SectionType.BUILDUP, bars=8, energy=0.6, gain_range=(0.4, 0.8), lpf_range=(2000, 8000), transition_out=TransitionType.RISER),
+        SectionTemplate(SectionType.DROP, bars=16, energy=1.0, gain_range=(0.9, 1.0), lpf_range=(8000, 12000), transition_in=TransitionType.IMPACT),
+        SectionTemplate(SectionType.BREAKDOWN, bars=8, energy=0.3, gain_range=(0.3, 0.5), lpf_range=(2000, 4000)),
+        SectionTemplate(SectionType.BUILDUP, bars=8, energy=0.7, gain_range=(0.5, 0.9), lpf_range=(3000, 10000), transition_out=TransitionType.RISER),
+        SectionTemplate(SectionType.DROP, bars=16, energy=1.0, gain_range=(0.9, 1.0), lpf_range=(8000, 12000), transition_in=TransitionType.IMPACT),
+        SectionTemplate(SectionType.OUTRO, bars=8, energy=0.2, gain_range=(0.5, 0.1), lpf_range=(6000, 1000)),
+    ],
+
+    SongForm.BALLAD: [
+        SectionTemplate(SectionType.INTRO, bars=4, energy=0.2, gain_range=(0.2, 0.3), lpf_range=(2000, 4000)),
+        SectionTemplate(SectionType.VERSE, bars=8, energy=0.4, gain_range=(0.3, 0.5), lpf_range=(3000, 5000)),
+        SectionTemplate(SectionType.CHORUS, bars=8, energy=0.6, gain_range=(0.5, 0.7), lpf_range=(4000, 7000)),
+        SectionTemplate(SectionType.VERSE, bars=8, energy=0.5, gain_range=(0.4, 0.6), lpf_range=(3000, 6000)),
+        SectionTemplate(SectionType.CHORUS, bars=8, energy=0.7, gain_range=(0.6, 0.8), lpf_range=(5000, 8000)),
+        SectionTemplate(SectionType.BRIDGE, bars=8, energy=0.8, gain_range=(0.7, 0.9), lpf_range=(6000, 10000)),
+        SectionTemplate(SectionType.CHORUS, bars=8, energy=0.7, gain_range=(0.6, 0.8), lpf_range=(5000, 8000)),
+        SectionTemplate(SectionType.OUTRO, bars=8, energy=0.2, gain_range=(0.4, 0.1), lpf_range=(4000, 2000)),
+    ],
+
+    SongForm.ROCK: [
+        SectionTemplate(SectionType.INTRO, bars=4, energy=0.7, gain_range=(0.6, 0.8), transition_in=TransitionType.IMPACT),
+        SectionTemplate(SectionType.VERSE, bars=8, energy=0.6, gain_range=(0.6, 0.7)),
+        SectionTemplate(SectionType.CHORUS, bars=8, energy=0.9, gain_range=(0.8, 1.0), transition_in=TransitionType.FILL),
+        SectionTemplate(SectionType.VERSE, bars=8, energy=0.7, gain_range=(0.6, 0.8)),
+        SectionTemplate(SectionType.CHORUS, bars=8, energy=1.0, gain_range=(0.9, 1.0), transition_in=TransitionType.FILL),
+        SectionTemplate(SectionType.BRIDGE, bars=8, energy=0.5, gain_range=(0.5, 0.7), transition_in=TransitionType.BREAKDOWN),
+        SectionTemplate(SectionType.CHORUS, bars=8, energy=1.0, gain_range=(0.9, 1.0), transition_in=TransitionType.FILL),
+        SectionTemplate(SectionType.OUTRO, bars=8, energy=0.8, gain_range=(0.8, 0.5)),
+    ],
+
+    SongForm.JAZZ_STANDARD: [
+        SectionTemplate(SectionType.INTRO, bars=4, energy=0.4, gain_range=(0.4, 0.5)),
+        SectionTemplate(SectionType.VERSE, bars=8, energy=0.5, gain_range=(0.5, 0.6)),  # Head A
+        SectionTemplate(SectionType.VERSE, bars=8, energy=0.6, gain_range=(0.5, 0.7)),  # Head A
+        SectionTemplate(SectionType.BRIDGE, bars=8, energy=0.6, gain_range=(0.6, 0.7)),  # Head B
+        SectionTemplate(SectionType.VERSE, bars=8, energy=0.7, gain_range=(0.6, 0.8)),  # Head A
+        # Solo sections would go here
+        SectionTemplate(SectionType.VERSE, bars=8, energy=0.6, gain_range=(0.5, 0.7)),  # Out Head
+        SectionTemplate(SectionType.OUTRO, bars=4, energy=0.4, gain_range=(0.5, 0.3)),
+    ],
+}
+
+
+# Default dynamics for each section type
+SECTION_DYNAMICS = {
+    SectionType.INTRO: {"gain": (0.3, 0.5), "lpf": (2000, 4000)},
+    SectionType.VERSE: {"gain": (0.5, 0.7), "lpf": (3000, 6000)},
+    SectionType.PRECHORUS: {"gain": (0.6, 0.8), "lpf": (5000, 8000)},
+    SectionType.CHORUS: {"gain": (0.8, 1.0), "lpf": (6000, 10000)},
+    SectionType.BRIDGE: {"gain": (0.4, 0.6), "lpf": (2000, 5000)},
+    SectionType.BREAKDOWN: {"gain": (0.3, 0.5), "lpf": (2000, 4000)},
+    SectionType.BUILDUP: {"gain": (0.4, 0.8), "lpf": (2000, 8000)},
+    SectionType.DROP: {"gain": (0.9, 1.0), "lpf": (8000, 12000)},
+    SectionType.OUTRO: {"gain": (0.5, 0.2), "lpf": (4000, 1000)},
+}
 
 
 @dataclass
 class SectionConfig:
-    """Configuration for a song section."""
+    """Configuration for a song section (legacy compatibility)."""
 
     section_type: SectionType
     bars: int = 4  # Length of this section in bars
@@ -50,6 +199,35 @@ class SectionConfig:
     rhythm_fitness_modifier: float = 1.0  # Multiplier for rhythm density
     melody_fitness_modifier: float = 1.0  # Multiplier for melody complexity
     chord_fitness_modifier: float = 1.0  # Multiplier for chord complexity
+
+    # Dynamics
+    gain_range: tuple[float, float] = None
+    lpf_range: tuple[float, float] = None
+    transition_in: TransitionType = TransitionType.CUT
+    transition_out: TransitionType = TransitionType.CUT
+
+    def __post_init__(self):
+        # Set defaults from section type if not specified
+        if self.gain_range is None:
+            defaults = SECTION_DYNAMICS.get(self.section_type, {"gain": (0.5, 0.7)})
+            self.gain_range = defaults["gain"]
+        if self.lpf_range is None:
+            defaults = SECTION_DYNAMICS.get(self.section_type, {"lpf": (3000, 6000)})
+            self.lpf_range = defaults["lpf"]
+
+    @classmethod
+    def from_template(cls, template: SectionTemplate) -> "SectionConfig":
+        """Create SectionConfig from a SectionTemplate."""
+        return cls(
+            section_type=template.section_type,
+            bars=template.bars,
+            energy_level=template.energy,
+            rhythm_fitness_modifier=template.density_modifier,
+            gain_range=template.gain_range,
+            lpf_range=template.lpf_range,
+            transition_in=template.transition_in,
+            transition_out=template.transition_out,
+        )
 
 
 @dataclass
@@ -84,6 +262,16 @@ class InstrumentConfig:
     play_in_sections: list[SectionType] = (
         None  # Which sections this instrument plays in
     )
+
+    # Inter-layer fitness (new features)
+    use_inter_layer_fitness: bool = False  # Enable contextual fitness
+    inter_layer_weight: float = 0.3  # Weight for inter-layer fitness (0.0-1.0)
+    layer_role: str = "melody"  # Role: chords, drums, bass, melody, pad, lead
+
+    # Harmonic context (new features)
+    use_harmonic_context: bool = False  # Enable chord-aware melody evolution
+    genre: str = "pop"  # Genre for chord-melody strictness
+    harmony_weight: float = 0.4  # Weight for harmonic fitness
 
     def __post_init__(self):
         if self.scale is None:
@@ -151,6 +339,11 @@ class SongComposer:
         self.evolved_sections: dict[SectionType, EvolvedSection] = {}
         self.composition_scale: str = ""
 
+        # Inter-layer fitness tracking (per section)
+        self._current_section_layers: dict[str, tuple[Layer, str]] = {}
+        self._current_section_chords: ChordProgression = None
+        self._harmonic_context: HarmonicContext = None
+
     def add_instrument(self, config: InstrumentConfig) -> None:
         """Add an instrument to the song."""
         self.instruments.append(config)
@@ -165,6 +358,56 @@ class SongComposer:
         Example: [INTRO, VERSE, CHORUS, VERSE, CHORUS, BRIDGE, CHORUS, OUTRO]
         """
         self.song_structure = structure
+
+    def use_song_form(self, form: SongForm) -> None:
+        """Configure the song using a pre-defined song form.
+
+        This sets up the sections and song structure based on the chosen form.
+
+        Args:
+            form: One of the pre-defined SongForm values
+        """
+        templates = SONG_FORM_TEMPLATES.get(form)
+        if not templates:
+            raise ValueError(f"Unknown song form: {form}")
+
+        # Clear existing sections
+        self.sections = []
+        self.song_structure = []
+
+        # Add sections from templates
+        for template in templates:
+            config = SectionConfig.from_template(template)
+            self.sections.append(config)
+            self.song_structure.append(template.section_type)
+
+    def get_section_dynamics(self, section_type: SectionType) -> tuple[DynamicEnvelope, FilterEnvelope]:
+        """Get dynamic and filter envelopes for a section type.
+
+        Args:
+            section_type: The type of section
+
+        Returns:
+            Tuple of (DynamicEnvelope, FilterEnvelope) for the section
+        """
+        # Find the section config
+        config = self._get_section_config(section_type)
+
+        # Create envelopes based on section dynamics
+        gain_start, gain_end = config.gain_range
+        lpf_start, lpf_end = config.lpf_range
+
+        # Simple linear envelopes
+        dynamic_env = DynamicEnvelope(
+            points=[(0.0, gain_start), (1.0, gain_end)],
+            envelope_type="linear"
+        )
+        filter_env = FilterEnvelope(
+            points=[(0.0, lpf_start), (1.0, lpf_end)],
+            envelope_type="linear"
+        )
+
+        return dynamic_env, filter_env
 
     def _get_section_config(self, section_type: SectionType) -> SectionConfig:
         """Get config for a section type."""
@@ -256,15 +499,39 @@ class SongComposer:
             for _ in range(self.population_size)
         ]
 
+        # Build the effective fitness function
+        base_fitness_fn = instrument.melody_fitness_fn
+
+        # Wrap with harmonic context if enabled and we have chords
+        if instrument.use_harmonic_context and self._harmonic_context:
+            from fitness.harmony import create_harmony_fitness
+            base_fitness_fn = create_harmony_fitness(
+                intrinsic_fitness=base_fitness_fn,
+                harmonic_context=self._harmonic_context,
+                genre=instrument.genre,
+                harmony_weight=instrument.harmony_weight,
+            )
+
+        # Wrap with contextual (inter-layer) fitness if enabled
+        if instrument.use_inter_layer_fitness and self._current_section_layers:
+            from fitness.contextual import create_contextual_fitness
+            base_fitness_fn = create_contextual_fitness(
+                intrinsic_fitness=base_fitness_fn,
+                evolved_layers=self._current_section_layers,
+                use_context=True,
+                intrinsic_weight=1.0 - instrument.inter_layer_weight,
+                context_weight=instrument.inter_layer_weight,
+            )
+
         def melody_fitness(phrase: Phrase) -> float:
-            if instrument.melody_fitness_fn:
+            if base_fitness_fn:
                 layer = Layer(
                     name=instrument.name,
                     phrases=[phrase],
                     instrument=instrument.instrument,
                     rhythm=rhythm,
                 )
-                base_score = instrument.melody_fitness_fn.evaluate(layer)
+                base_score = base_fitness_fn.evaluate(layer)
                 return base_score * section.melody_fitness_modifier
             return 0.5
 
@@ -364,6 +631,19 @@ class SongComposer:
 
         return population[0].genome, population[0].fitness
 
+    def _get_sorted_instruments(self) -> list[InstrumentConfig]:
+        """Sort instruments by layer role priority for proper evolution order.
+
+        Chords evolve first (provide harmonic context), then drums, bass, melody, pad, lead.
+        """
+        LAYER_ROLE_PRIORITY = {
+            "chords": 0, "drums": 1, "bass": 2, "melody": 3, "pad": 4, "lead": 5
+        }
+        return sorted(
+            self.instruments,
+            key=lambda i: LAYER_ROLE_PRIORITY.get(i.layer_role, 10)
+        )
+
     def evolve_section(
         self, section_type: SectionType, verbose: bool = True
     ) -> EvolvedSection:
@@ -383,7 +663,15 @@ class SongComposer:
             bars=section_config.bars,
         )
 
-        for instrument in self.instruments:
+        # Reset inter-layer tracking for this section
+        self._current_section_layers = {}
+        self._current_section_chords = None
+        self._harmonic_context = None
+
+        # Sort instruments by role priority (chords first, then drums, bass, melody, etc.)
+        sorted_instruments = self._get_sorted_instruments()
+
+        for instrument in sorted_instruments:
             # Skip if instrument doesn't play in this section
             if section_type not in instrument.play_in_sections:
                 if verbose:
@@ -402,12 +690,33 @@ class SongComposer:
                 if verbose:
                     print(f"     Rhythm: {rhythm} (fitness: {fitness:.3f})")
 
+                # Track for inter-layer fitness (drums can inform other layers)
+                drum_layer = Layer(
+                    name=instrument.name,
+                    phrases=[],
+                    instrument=instrument.instrument,
+                    rhythm=rhythm,
+                    is_drum=True,
+                )
+                self._current_section_layers[instrument.name] = (drum_layer, rhythm)
+
             elif instrument.is_chord_layer:
-                # Chord layer
+                # Chord layer - evolve first to provide harmonic context
                 chords, fitness = self._evolve_chords(
                     instrument, section_config, verbose
                 )
                 evolved.chords[instrument.name] = chords
+                self._current_section_chords = chords
+
+                # Set up harmonic context for melodic layers
+                scale_parts = self.composition_scale.split(":")
+                self._harmonic_context = HarmonicContext(
+                    chord_progression=chords,
+                    beats_per_chord=4,  # One chord per bar typically
+                    scale_root=scale_parts[0] if scale_parts else "c",
+                    scale_type=scale_parts[1] if len(scale_parts) > 1 else "major",
+                )
+
                 if verbose:
                     chord_summary = " → ".join(
                         f"deg{c.root_degree}" for c in chords.chords
@@ -429,6 +738,15 @@ class SongComposer:
                 if verbose:
                     print(f"     Rhythm: {rhythm} (fitness: {r_fitness:.3f})")
                     print(f"     Melody fitness: {m_fitness:.3f}")
+
+                # Track evolved layer for inter-layer fitness
+                layer = Layer(
+                    name=instrument.name,
+                    phrases=[phrase],
+                    instrument=instrument.instrument,
+                    rhythm=rhythm,
+                )
+                self._current_section_layers[instrument.name] = (layer, rhythm)
 
         return evolved
 

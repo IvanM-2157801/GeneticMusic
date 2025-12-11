@@ -135,102 +135,117 @@ def main():
     ])
     
     # === DEFINE INSTRUMENTS ===
-    # Pentatonic scale for ambient consonance
+    # Pentatonic scale for ambient consonance - very ethereal
     c_pentatonic = [
         NoteName.C, NoteName.D, NoteName.E, NoteName.G, NoteName.A,
     ]
-    
+
     print("\n📋 Adding ambient instruments...")
-    
-    # 1. AMBIENT CHORDS - Ethereal pads
-    print("  🎹 Ambient Chords - Ethereal harmony")
+    print("   Note: Ambient uses very sparse rhythms with lots of space")
+
+    # 1. AMBIENT CHORDS - Ethereal sustained pads (one chord per 2 bars)
+    print("  🎹 Ambient Chords - Ethereal harmony (1 chord per 2 bars)")
     composer.add_instrument(InstrumentConfig(
         name="ambient_chords",
         instrument="sine",
-        beats_per_bar=8,
-        octave_range=(3, 4),  # Lower, warmer
+        beats_per_bar=1,  # One chord per bar = very sustained
+        octave_range=(3, 4),
         scale=c_pentatonic,
         is_chord_layer=True,
-        notes_per_chord=3,  # Simpler voicings
+        notes_per_chord=3,
         allowed_chord_types=["major", "minor", "sus2", "sus4"],
         chord_fitness_fn=AmbientChordFitness(),
         octave_shift=3,
-        gain=0.15,  # Very quiet, atmospheric
-        lpf=3000,  # Warmer
+        gain=0.18,
+        lpf=2500,
         use_scale_degrees=True,
         play_in_sections=[SectionType.INTRO, SectionType.VERSE, SectionType.CHORUS, SectionType.BRIDGE, SectionType.OUTRO],
+        layer_role="chords",
     ))
-    
-    # 2. PAD 1 - Low drone
-    print("  🎹 Low Pad - Foundation drone")
+
+    # 2. LOW DRONE - Very sparse, sustained foundation
+    print("  🎹 Low Drone - Foundation (very sparse)")
     composer.add_instrument(InstrumentConfig(
         name="low_pad",
         instrument="sawtooth",
-        beats_per_bar=8,  # Long notes
-        max_subdivision=1,  # Very simple rhythms
-        octave_range=(2, 4),
+        beats_per_bar=4,  # 4 beats but sparse rhythm = few notes
+        max_subdivision=1,  # Only single hits, no subdivisions
+        octave_range=(2, 3),  # Low register
         scale=c_pentatonic,
         rhythm_fitness_fn=RHYTHM_FITNESS_FUNCTIONS["ambient"],
         melody_fitness_fn=AmbientFitness(),
         octave_shift=2,
-        gain=0.3,
-        lpf=1500,  # Low pass for warmth
+        gain=0.35,
+        lpf=1200,  # Very warm
         use_scale_degrees=True,
         play_in_sections=[SectionType.INTRO, SectionType.VERSE, SectionType.CHORUS, SectionType.BRIDGE, SectionType.OUTRO],
+        layer_role="bass",
+        use_inter_layer_fitness=True,
+        inter_layer_weight=0.2,
     ))
-    
-    # 2. PAD 2 - Mid-range texture
-    print("  🎹 Mid Pad - Harmonic texture")
+
+    # 3. MID PAD - Sparse harmonic texture
+    print("  🎹 Mid Pad - Harmonic texture (sparse)")
     composer.add_instrument(InstrumentConfig(
         name="mid_pad",
         instrument="sine",
-        beats_per_bar=8,
+        beats_per_bar=4,
         max_subdivision=1,
-        octave_range=(4, 6),
+        octave_range=(4, 5),
         scale=c_pentatonic,
         rhythm_fitness_fn=RHYTHM_FITNESS_FUNCTIONS["ambient"],
         melody_fitness_fn=AmbientFitness(),
         octave_shift=4,
-        gain=0.3,
-        lpf=4000,
+        gain=0.25,
+        lpf=3500,
         use_scale_degrees=True,
         play_in_sections=[SectionType.VERSE, SectionType.CHORUS, SectionType.BRIDGE, SectionType.OUTRO],
+        layer_role="pad",
+        use_inter_layer_fitness=True,
+        inter_layer_weight=0.2,
     ))
-    
-    # 3. HIGH SHIMMER - Ethereal high notes
-    print("  ✨ High Shimmer - Ethereal tones")
+
+    # 4. HIGH SHIMMER - Occasional ethereal high notes
+    print("  ✨ High Shimmer - Ethereal accents (very sparse)")
     composer.add_instrument(InstrumentConfig(
         name="shimmer",
         instrument="triangle",
         beats_per_bar=4,
-        max_subdivision=2,
-        octave_range=(5, 7),
+        max_subdivision=1,  # No subdivisions for ambient
+        octave_range=(5, 6),
         scale=c_pentatonic,
         rhythm_fitness_fn=RHYTHM_FITNESS_FUNCTIONS["ambient"],
         melody_fitness_fn=AmbientFitness(),
-        octave_shift=6,
-        gain=0.2,  # Very soft
-        lpf=8000,
+        octave_shift=5,
+        gain=0.15,  # Very soft
+        lpf=6000,
         use_scale_degrees=True,
         play_in_sections=[SectionType.CHORUS, SectionType.BRIDGE],
+        layer_role="lead",
     ))
-    
-    # 4. MELODIC VOICE - Occasional melody
-    print("  🎵 Melodic Voice - Floating melody")
+
+    # 5. MELODIC VOICE - Floating melody with breathing space
+    print("  🎵 Melodic Voice - Floating melody (with space)")
     composer.add_instrument(InstrumentConfig(
         name="melody",
         instrument="sine",
         beats_per_bar=4,
-        max_subdivision=2,
-        octave_range=(4, 6),
+        max_subdivision=1,
+        octave_range=(4, 5),
         scale=c_pentatonic,
         rhythm_fitness_fn=RHYTHM_FITNESS_FUNCTIONS["ambient"],
-        melody_fitness_fn=StableFitness(),  # Smooth movement
-        octave_shift=5,
-        gain=0.25,
-        lpf=5000,
+        melody_fitness_fn=StableFitness(),
+        octave_shift=4,
+        gain=0.22,
+        lpf=4500,
         use_scale_degrees=True,
         play_in_sections=[SectionType.VERSE, SectionType.CHORUS],
+        layer_role="melody",
+        use_inter_layer_fitness=True,
+        inter_layer_weight=0.25,
+        use_harmonic_context=True,
+        genre="ambient",
+        harmony_weight=0.3,
     ))
     
     # No drums for pure ambient - just texture

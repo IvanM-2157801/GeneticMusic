@@ -235,20 +235,129 @@ def jazz_kick_fitness(rhythm: str) -> float:
 
 
 def electronic_kick_fitness(rhythm: str) -> float:
-    """Electronic kick drum: Four-on-the-floor or quantized patterns."""
-    from fitness.rhythm import rhythm_consistency, rhythm_density
+    """Electronic kick drum: Four-on-the-floor - kick on EVERY beat.
 
-    # Check for four-on-the-floor pattern (every beat)
-    all_beats = sum(1 for c in rhythm if int(c) >= 1)
-    four_on_floor_score = all_beats / len(rhythm) if rhythm else 0.0
+    The classic EDM kick pattern is "1111" or "11111111" - a kick on every
+    single beat. This creates the driving, relentless feel of electronic music.
 
-    # Very consistent
+    Example ideal patterns: "1111", "11111111", "10101010" (half-time)
+    """
+    if not rhythm:
+        return 0.0
+
+    # Four-on-the-floor: EVERY beat should have a kick (value >= 1)
+    kicks_on_beat = sum(1 for c in rhythm if c != '0')
+    total_beats = len(rhythm)
+
+    # Perfect score if every beat has a kick
+    four_on_floor_score = kicks_on_beat / total_beats
+
+    # Strong preference for simple single hits (1s) - not subdivisions
+    # We want "1111" not "2222" or "4444"
+    ones_count = rhythm.count('1')
+    simplicity_score = ones_count / max(kicks_on_beat, 1) if kicks_on_beat > 0 else 0
+
+    # Penalize rests - electronic kick should be relentless
+    no_rest_score = 1.0 - (rhythm.count('0') / total_beats)
+
+    # Very consistent pattern
+    from fitness.rhythm import rhythm_consistency
     consistency = rhythm_consistency(rhythm)
 
     return (
-        0.50 * four_on_floor_score  # Every beat or regular pattern
-        + 0.35 * consistency  # Very consistent
-        + 0.15 * rhythm_density(rhythm)  # Moderate density
+        0.45 * four_on_floor_score +  # Kick on every beat
+        0.25 * simplicity_score +  # Simple 1s, not subdivisions
+        0.20 * no_rest_score +  # No rests
+        0.10 * consistency  # Consistent pattern
+    )
+
+
+def electronic_hihat_fitness(rhythm: str) -> float:
+    """Electronic hi-hat: Offbeat pattern or steady 8ths/16ths.
+
+    Classic electronic hi-hat patterns:
+    - Offbeat: "02020202" (hat on the "and" of each beat)
+    - Steady 8ths: "22222222"
+    - Steady 16ths: "44444444"
+
+    Example ideal patterns: "02020202", "22222222", "21212121"
+    """
+    if not rhythm:
+        return 0.0
+
+    total_beats = len(rhythm)
+
+    # Check for offbeat pattern (notes on even indices, rests on odd)
+    offbeat_score = 0
+    for i, c in enumerate(rhythm):
+        if i % 2 == 1 and c != '0':  # Offbeat positions should have notes
+            offbeat_score += 1
+        elif i % 2 == 0 and c == '0':  # On-beat positions can be rest (pure offbeat)
+            offbeat_score += 0.5
+
+    offbeat_ratio = offbeat_score / total_beats
+
+    # High density is good for hi-hats
+    from fitness.rhythm import rhythm_density, rhythm_consistency
+    density = rhythm_density(rhythm)
+    density_score = min(density * 1.5, 1.0)
+
+    # Consistency (repetitive patterns)
+    consistency = rhythm_consistency(rhythm)
+
+    # Prefer even subdivisions (2s and 4s)
+    even_count = rhythm.count('2') + rhythm.count('4')
+    even_score = even_count / total_beats
+
+    return (
+        0.30 * offbeat_ratio +  # Offbeat emphasis
+        0.25 * density_score +  # High density
+        0.25 * consistency +  # Consistent pattern
+        0.20 * even_score  # Even subdivisions
+    )
+
+
+def electronic_clap_fitness(rhythm: str) -> float:
+    """Electronic clap/snare: On beats 2 and 4 (backbeat).
+
+    Classic EDM clap pattern is "0101" or "01010101" - clap on beats 2 and 4.
+
+    Example ideal patterns: "0101", "01010101", "00100010"
+    """
+    if not rhythm:
+        return 0.0
+
+    total_beats = len(rhythm)
+
+    # Backbeat: notes should be on beats 2, 4, 6, 8... (indices 1, 3, 5, 7...)
+    backbeat_score = 0
+    backbeat_positions = 0
+
+    for i in range(total_beats):
+        if i % 2 == 1:  # Backbeat position (2, 4, 6, 8...)
+            backbeat_positions += 1
+            if rhythm[i] != '0':
+                backbeat_score += 1
+        else:  # On-beat position (1, 3, 5, 7...)
+            # Reward rests on downbeats for clean backbeat
+            if rhythm[i] == '0':
+                backbeat_score += 0.3
+
+    backbeat_ratio = backbeat_score / max(backbeat_positions + total_beats / 2, 1)
+
+    # Sparse - clap is accent, not filler
+    rest_ratio = rhythm.count('0') / total_beats
+    sparsity_score = min(rest_ratio * 1.5, 1.0)
+
+    # Simple single hits (1s)
+    ones_count = rhythm.count('1')
+    non_rest = total_beats - rhythm.count('0')
+    simplicity_score = ones_count / max(non_rest, 1) if non_rest > 0 else 0
+
+    return (
+        0.50 * backbeat_ratio +  # Strong backbeat
+        0.30 * sparsity_score +  # Sparse
+        0.20 * simplicity_score  # Simple hits
     )
 
 
@@ -271,8 +380,8 @@ DRUM_GENRE_FUNCTIONS = {
     },
     "electronic": {
         "kick": electronic_kick_fitness,
-        "hihat": hihat_pattern_fitness,
-        "snare": snare_pattern_fitness,
+        "hihat": electronic_hihat_fitness,
+        "snare": electronic_clap_fitness,
     },
 }
 
@@ -287,4 +396,6 @@ DRUM_FITNESS_FUNCTIONS = {
     "metal_kick": metal_kick_fitness,
     "jazz_kick": jazz_kick_fitness,
     "electronic_kick": electronic_kick_fitness,
+    "electronic_hihat": electronic_hihat_fitness,
+    "electronic_clap": electronic_clap_fitness,
 }
