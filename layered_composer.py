@@ -71,6 +71,8 @@ class LayerConfig:
     use_scale_degrees: bool = True  # Use 0-7 scale degrees
     chord_mode: bool = False  # Use comma-separated notes for chords
     base_octave: int = 4  # Base octave for scale degree calculation (notes at this octave output 0-6)
+    # Context group - layers with the same group name share context during evolution
+    context_group: str = ""
     # Drum parameters
     is_drum: bool = False  # If True, only evolves rhythm (no melody)
     drum_sound: str = ""  # Drum sound name (e.g., "bd", "hh", "sd")
@@ -88,6 +90,9 @@ class LayerConfig:
     harmony_weight: float = 0.4  # Weight for harmonic fitness (0.0-1.0)
     # Layer role for evolution ordering
     layer_role: str = "melody"  # "chords", "drums", "bass", "melody", "pad"
+    # Contextual fitness weights for inter-layer scoring
+    # Available metrics: "rhythmic", "density", "harmonic", "voice_leading", "call_response"
+    contextual_weights: dict = None  # e.g., {"rhythmic": 0.4, "harmonic": 0.3}
 
     def __post_init__(self):
         if self.scale is None:
@@ -273,6 +278,8 @@ class LayeredComposer:
             intrinsic_fitness=harmony_fitness,
             evolved_layers=self.evolved_layers,
             use_context=self.use_context,
+            context_group=config.context_group,
+            metric_weights=config.contextual_weights,
         )
 
         def melody_fitness(phrase: Phrase) -> float:
@@ -446,6 +453,8 @@ class LayeredComposer:
                     rhythm=rhythm,
                     is_drum=True,
                     drum_sound=config.drum_sound,
+                    layer_role=config.layer_role,
+                    context_group=config.context_group,
                 )
                 self.evolved_layers[config.name] = (drum_layer, rhythm)
 
@@ -464,6 +473,8 @@ class LayeredComposer:
                     gain=config.gain,
                     lpf=config.lpf,
                     octave_shift=config.octave_shift,
+                    layer_role=config.layer_role,
+                    context_group=config.context_group,
                 )
                 self.evolved_layers[config.name] = (chord_layer, rhythm)
 
@@ -493,6 +504,8 @@ class LayeredComposer:
                     phrases=[phrase],
                     instrument=config.instrument,
                     rhythm=rhythm,
+                    layer_role=config.layer_role,
+                    context_group=config.context_group,
                 )
                 self.evolved_layers[config.name] = (melodic_layer, rhythm)
 
@@ -534,6 +547,8 @@ class LayeredComposer:
                         pan=config.pan,
                         is_drum=True,
                         drum_sound=config.drum_sound,
+                        layer_role=config.layer_role,
+                        context_group=config.context_group,
                     )
                     layers.append(layer)
 
@@ -572,6 +587,8 @@ class LayeredComposer:
                         release=config.release,
                         is_chord_layer=True,
                         chord_progression=chord_progression.chords,
+                        layer_role=config.layer_role,
+                        context_group=config.context_group,
                     )
                     layers.append(layer)
 
@@ -611,6 +628,8 @@ class LayeredComposer:
                         use_scale_degrees=config.use_scale_degrees,
                         chord_mode=config.chord_mode,
                         base_octave=config.base_octave,
+                        layer_role=config.layer_role,
+                        context_group=config.context_group,
                     )
                     layers.append(layer)
 

@@ -27,12 +27,22 @@ class ContextualFitness(FitnessFunction):
     - Bass-melody harmonic support
     """
 
+    # Default metric weights for contextual fitness
+    DEFAULT_METRIC_WEIGHTS = {
+        "rhythmic": 0.25,
+        "density": 0.15,
+        "harmonic": 0.25,
+        "voice_leading": 0.20,
+        "call_response": 0.15,
+    }
+
     def __init__(
         self,
         intrinsic_fitness: FitnessFunction,
         context_layers: list[tuple[Layer, str]],  # (layer, rhythm) pairs
         intrinsic_weight: float = 0.7,
         context_weight: float = 0.3,
+        metric_weights: dict[str, float] = None,
     ):
         """Initialize contextual fitness.
 
@@ -41,20 +51,24 @@ class ContextualFitness(FitnessFunction):
             context_layers: List of (layer, rhythm) tuples for context
             intrinsic_weight: Weight for intrinsic fitness (0.0-1.0)
             context_weight: Weight for contextual fitness (0.0-1.0)
+            metric_weights: Custom weights for context metrics. Available metrics:
+                - "rhythmic": How rhythms complement each other (0.0-1.0)
+                - "density": Different busy-ness levels between layers (0.0-1.0)
+                - "harmonic": Consonant intervals between melodic layers (0.0-1.0)
+                - "voice_leading": Contrary motion, avoid parallel 5ths/octaves (0.0-1.0)
+                - "call_response": Alternating activity patterns (0.0-1.0)
+                If None, uses DEFAULT_METRIC_WEIGHTS.
         """
         self.intrinsic_fitness = intrinsic_fitness
         self.context_layers = context_layers
         self.intrinsic_weight = intrinsic_weight
         self.context_weight = context_weight
 
-        # Weights for different context metrics
-        self.metric_weights = {
-            "rhythmic": 0.25,
-            "density": 0.15,
-            "harmonic": 0.25,
-            "voice_leading": 0.20,
-            "call_response": 0.15,
-        }
+        # Use provided weights or defaults
+        if metric_weights is not None:
+            self.metric_weights = {**self.DEFAULT_METRIC_WEIGHTS, **metric_weights}
+        else:
+            self.metric_weights = self.DEFAULT_METRIC_WEIGHTS.copy()
 
     def evaluate(self, layer: Layer) -> float:
         """Evaluate layer considering both intrinsic quality and context fit."""
@@ -322,19 +336,52 @@ class ContextualFitness(FitnessFunction):
 
     def _is_bass_melody_pair(self, layer1: Layer, layer2: Layer) -> bool:
         """Check if two layers form a bass-melody pair."""
-        # Simple heuristic based on layer names and octave ranges
-        bass_keywords = {"bass", "low", "sub"}
-        melody_keywords = {"melody", "lead", "high", "voice"}
+        role1 = layer1.layer_role
+        role2 = layer2.layer_role
 
-        name1_lower = layer1.name.lower()
-        name2_lower = layer2.name.lower()
-
-        is_bass1 = any(kw in name1_lower for kw in bass_keywords)
-        is_bass2 = any(kw in name2_lower for kw in bass_keywords)
-        is_melody1 = any(kw in name1_lower for kw in melody_keywords)
-        is_melody2 = any(kw in name2_lower for kw in melody_keywords)
+        is_bass1 = role1 == "bass"
+        is_bass2 = role2 == "bass"
+        is_melody1 = role1 in ("melody", "lead")
+        is_melody2 = role2 in ("melody", "lead")
 
         return (is_bass1 and is_melody2) or (is_bass2 and is_melody1)
+
+    def _get_role_relationship(self, layer1: Layer, layer2: Layer) -> str:
+        """Get the relationship type between two layers based on their roles.
+
+        Returns one of:
+        - "bass_melody": Bass supporting melody/lead
+        - "chords_melody": Chords supporting melody/lead
+        - "chords_bass": Chords and bass (harmonic foundation)
+        - "drums_melody": Drums and melody (rhythmic alignment)
+        - "drums_bass": Drums and bass (rhythmic lock)
+        - "parallel_melody": Two melodic layers (melody, lead, pad)
+        - "same_role": Same role (e.g., two drum layers)
+        - "other": No specific relationship
+        """
+        role1, role2 = layer1.layer_role, layer2.layer_role
+
+        # Sort roles for consistent comparison
+        roles = tuple(sorted([role1, role2]))
+
+        relationships = {
+            ("bass", "lead"): "bass_melody",
+            ("bass", "melody"): "bass_melody",
+            ("chords", "lead"): "chords_melody",
+            ("chords", "melody"): "chords_melody",
+            ("bass", "chords"): "chords_bass",
+            ("drums", "lead"): "drums_melody",
+            ("drums", "melody"): "drums_melody",
+            ("bass", "drums"): "drums_bass",
+            ("lead", "melody"): "parallel_melody",
+            ("melody", "pad"): "parallel_melody",
+            ("lead", "pad"): "parallel_melody",
+        }
+
+        if role1 == role2:
+            return "same_role"
+
+        return relationships.get(roles, "other")
 
     def _bass_melody_support(self, layer1: Layer, layer2: Layer) -> float:
         """Evaluate how well bass supports melody harmonically.
@@ -388,6 +435,8 @@ def create_contextual_fitness(
     use_context: bool = True,
     intrinsic_weight: float = 0.7,
     context_weight: float = 0.3,
+    context_group: str = "",
+    metric_weights: dict[str, float] = None,
 ) -> FitnessFunction:
     """Helper to create contextual fitness from evolved layers.
 
@@ -397,6 +446,14 @@ def create_contextual_fitness(
         use_context: If False, just returns intrinsic fitness
         intrinsic_weight: Weight for intrinsic quality (default 0.7)
         context_weight: Weight for context fit (default 0.3)
+        context_group: If set, only consider layers with the same context_group.
+                       Empty string means consider all layers.
+        metric_weights: Custom weights for context metrics. Available metrics:
+            - "rhythmic": How rhythms complement each other
+            - "density": Different busy-ness levels between layers
+            - "harmonic": Consonant intervals between melodic layers
+            - "voice_leading": Contrary motion, avoid parallel 5ths/octaves
+            - "call_response": Alternating activity patterns
 
     Returns:
         ContextualFitness wrapper or intrinsic fitness
@@ -404,10 +461,43 @@ def create_contextual_fitness(
     if not use_context or not evolved_layers:
         return intrinsic_fitness
 
-    context_list = list(evolved_layers.values())
+    # Filter by context_group if specified
+    if context_group:
+        filtered_layers = {
+            name: (layer, rhythm)
+            for name, (layer, rhythm) in evolved_layers.items()
+            if layer.context_group == context_group
+        }
+    else:
+        filtered_layers = evolved_layers
+
+    if not filtered_layers:
+        return intrinsic_fitness
+
+    context_list = list(filtered_layers.values())
     return ContextualFitness(
         intrinsic_fitness=intrinsic_fitness,
         context_layers=context_list,
         intrinsic_weight=intrinsic_weight,
         context_weight=context_weight,
+        metric_weights=metric_weights,
     )
+
+
+def get_context_groups(evolved_layers: dict[str, tuple[Layer, str]]) -> dict[str, list[str]]:
+    """Get a mapping of context groups to layer names.
+
+    Args:
+        evolved_layers: Dict of {name: (layer, rhythm)} for all layers
+
+    Returns:
+        Dict mapping context_group -> list of layer names in that group.
+        Layers with empty context_group are listed under "".
+    """
+    groups: dict[str, list[str]] = {}
+    for name, (layer, _) in evolved_layers.items():
+        group = layer.context_group
+        if group not in groups:
+            groups[group] = []
+        groups[group].append(name)
+    return groups

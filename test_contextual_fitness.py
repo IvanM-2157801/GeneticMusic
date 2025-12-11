@@ -7,12 +7,13 @@ This script demonstrates:
 3. How harmonic compatibility works between melodic layers
 4. How voice leading is evaluated
 5. How call-and-response patterns are detected
+6. How context_group filters which layers share context
 
 Run with: python test_contextual_fitness.py
 """
 
 from core.music import Note, NoteName, Phrase, Layer
-from fitness.contextual import ContextualFitness, create_contextual_fitness
+from fitness.contextual import ContextualFitness, create_contextual_fitness, get_context_groups
 from fitness.base import FitnessFunction
 
 
@@ -336,6 +337,137 @@ def test_full_contextual_evaluation():
             print(f"  vs {ctx_layer.name}: {score:.3f}")
 
 
+def test_context_groups():
+    """Test how context_group filters which layers share context."""
+    print_header("CONTEXT GROUPS")
+
+    # Create layers in different context groups
+    # Group "verse": drums, bass, melody
+    # Group "chorus": drums, bass, melody, lead
+    # No group: pad (shares context with everyone)
+
+    verse_drums = Layer(
+        name="verse_drums", instrument="drums", rhythm="12121212",
+        is_drum=True, layer_role="drums", context_group="verse"
+    )
+    verse_bass = Layer(
+        name="verse_bass", instrument="bass", rhythm="10101010",
+        phrases=[Phrase([Note(NoteName.C, 2), Note(NoteName.G, 2)])],
+        layer_role="bass", context_group="verse"
+    )
+    verse_melody = Layer(
+        name="verse_melody", instrument="synth", rhythm="11112222",
+        phrases=[Phrase([Note(NoteName.E, 4), Note(NoteName.G, 4)])],
+        layer_role="melody", context_group="verse"
+    )
+
+    chorus_drums = Layer(
+        name="chorus_drums", instrument="drums", rhythm="22222222",
+        is_drum=True, layer_role="drums", context_group="chorus"
+    )
+    chorus_bass = Layer(
+        name="chorus_bass", instrument="bass", rhythm="11111111",
+        phrases=[Phrase([Note(NoteName.C, 2), Note(NoteName.E, 2)])],
+        layer_role="bass", context_group="chorus"
+    )
+    chorus_melody = Layer(
+        name="chorus_melody", instrument="synth", rhythm="22221111",
+        phrases=[Phrase([Note(NoteName.G, 4), Note(NoteName.A, 4)])],
+        layer_role="melody", context_group="chorus"
+    )
+    chorus_lead = Layer(
+        name="chorus_lead", instrument="lead", rhythm="11002200",
+        phrases=[Phrase([Note(NoteName.B, 5), Note(NoteName.C, 6)])],
+        layer_role="lead", context_group="chorus"
+    )
+
+    global_pad = Layer(
+        name="global_pad", instrument="pad", rhythm="10001000",
+        phrases=[Phrase([Note(NoteName.C, 4), Note(NoteName.E, 4)])],
+        layer_role="pad", context_group=""  # Empty = shares with everyone
+    )
+
+    # Build evolved_layers dict
+    evolved_layers = {
+        "verse_drums": (verse_drums, "12121212"),
+        "verse_bass": (verse_bass, "10101010"),
+        "verse_melody": (verse_melody, "11112222"),
+        "chorus_drums": (chorus_drums, "22222222"),
+        "chorus_bass": (chorus_bass, "11111111"),
+        "chorus_melody": (chorus_melody, "22221111"),
+        "chorus_lead": (chorus_lead, "11002200"),
+        "global_pad": (global_pad, "10001000"),
+    }
+
+    # Show context groups
+    groups = get_context_groups(evolved_layers)
+
+    print("\nContext groups defined:")
+    for group, members in sorted(groups.items()):
+        group_name = group if group else "(no group - shares with all)"
+        print(f"  {group_name}: {', '.join(members)}")
+
+    # Demonstrate filtering
+    print("\n--- Creating contextual fitness for different groups ---\n")
+
+    # Verse context: should only see verse layers
+    print("Layer in 'verse' group sees:")
+    verse_fitness = create_contextual_fitness(
+        intrinsic_fitness=DummyFitness(),
+        evolved_layers=evolved_layers,
+        use_context=True,
+        context_group="verse",
+    )
+    if isinstance(verse_fitness, ContextualFitness):
+        for layer, rhythm in verse_fitness.context_layers:
+            print(f"  - {layer.name} ({layer.layer_role})")
+    else:
+        print("  (no context layers)")
+
+    # Chorus context: should only see chorus layers
+    print("\nLayer in 'chorus' group sees:")
+    chorus_fitness = create_contextual_fitness(
+        intrinsic_fitness=DummyFitness(),
+        evolved_layers=evolved_layers,
+        use_context=True,
+        context_group="chorus",
+    )
+    if isinstance(chorus_fitness, ContextualFitness):
+        for layer, rhythm in chorus_fitness.context_layers:
+            print(f"  - {layer.name} ({layer.layer_role})")
+    else:
+        print("  (no context layers)")
+
+    # No group context: should see ALL layers
+    print("\nLayer with no group (context_group='') sees:")
+    all_fitness = create_contextual_fitness(
+        intrinsic_fitness=DummyFitness(),
+        evolved_layers=evolved_layers,
+        use_context=True,
+        context_group="",  # Empty = see all
+    )
+    if isinstance(all_fitness, ContextualFitness):
+        for layer, rhythm in all_fitness.context_layers:
+            print(f"  - {layer.name} ({layer.layer_role})")
+    else:
+        print("  (no context layers)")
+
+    # Show role relationships within a group
+    print("\n--- Role relationships within 'chorus' group ---")
+    chorus_layers = [layer for layer, _ in evolved_layers.values() if layer.context_group == "chorus"]
+
+    # Create a temporary fitness to access the relationship method
+    temp_fitness = ContextualFitness(
+        intrinsic_fitness=DummyFitness(),
+        context_layers=[(l, "") for l in chorus_layers],
+    )
+
+    for i, layer1 in enumerate(chorus_layers):
+        for layer2 in chorus_layers[i+1:]:
+            relationship = temp_fitness._get_role_relationship(layer1, layer2)
+            print(f"  {layer1.name} <-> {layer2.name}: {relationship}")
+
+
 if __name__ == "__main__":
     test_rhythmic_compatibility()
     test_density_balance()
@@ -343,6 +475,7 @@ if __name__ == "__main__":
     test_voice_leading()
     test_call_response()
     test_full_contextual_evaluation()
+    test_context_groups()
 
     print("\n" + "="*60)
     print(" Tests complete!")

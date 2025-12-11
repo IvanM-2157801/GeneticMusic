@@ -238,6 +238,10 @@ class Layer:
         False  # If True, this layer plays chords from chord_progression
     )
     base_octave: int = 4  # Base octave for scale degree calculation
+    # Layer role for contextual fitness (chords, drums, bass, melody, pad, lead)
+    layer_role: str = "melody"
+    # Context group - layers with the same group name share context during evolution
+    context_group: str = ""
 
     def _build_effects_chain(self) -> str:
         """Build the effects chain for Strudel output."""
