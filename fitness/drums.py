@@ -21,14 +21,14 @@ def kick_pattern_fitness(rhythm: str) -> float:
 
     # For 8-beat patterns, emphasize beats 1 and 5 (indices 0 and 4)
     if beat_count >= 8:
-        if rhythm[0] != '0':  # Beat 1
+        if rhythm[0] != "0":  # Beat 1
             strong_beat_score += 0.5
-        if rhythm[4] != '0':  # Beat 5
+        if rhythm[4] != "0":  # Beat 5
             strong_beat_score += 0.5
     elif beat_count >= 4:
-        if rhythm[0] != '0':  # Beat 1
+        if rhythm[0] != "0":  # Beat 1
             strong_beat_score += 0.5
-        if beat_count > 2 and rhythm[2] != '0':  # Beat 3
+        if beat_count > 2 and rhythm[2] != "0":  # Beat 3
             strong_beat_score += 0.5
 
     # Prefer sparse patterns (not too busy)
@@ -36,17 +36,17 @@ def kick_pattern_fitness(rhythm: str) -> float:
     sparsity_score = 1.0 - min(density * 2, 1.0)  # Penalize high density
 
     # Prefer simple patterns (mostly 1s, few subdivisions)
-    simplicity_score = rhythm.count('1') / len(rhythm)
+    simplicity_score = rhythm.count("1") / len(rhythm)
 
     # Rest ratio (should have some rests for power)
-    rest_ratio = rhythm.count('0') / len(rhythm)
+    rest_ratio = rhythm.count("0") / len(rhythm)
     rest_score = min(rest_ratio * 1.5, 1.0)
 
     return (
-        0.40 * strong_beat_score +
-        0.25 * sparsity_score +
-        0.20 * simplicity_score +
-        0.15 * rest_score
+        0.40 * strong_beat_score
+        + 0.25 * sparsity_score
+        + 0.20 * simplicity_score
+        + 0.15 * rest_score
     )
 
 
@@ -73,18 +73,18 @@ def hihat_pattern_fitness(rhythm: str) -> float:
     consistency_score = 1.0 - unique_ratio
 
     # Prefer simple subdivisions (1s and 2s, not 3s and 4s)
-    simple_count = rhythm.count('1') + rhythm.count('2')
+    simple_count = rhythm.count("1") + rhythm.count("2")
     simplicity_score = simple_count / len(rhythm)
 
     # Few rests (hi-hat keeps time)
-    rest_ratio = rhythm.count('0') / len(rhythm)
+    rest_ratio = rhythm.count("0") / len(rhythm)
     no_rest_score = 1.0 - rest_ratio
 
     return (
-        0.35 * density_score +
-        0.30 * consistency_score +
-        0.20 * simplicity_score +
-        0.15 * no_rest_score
+        0.35 * density_score
+        + 0.30 * consistency_score
+        + 0.20 * simplicity_score
+        + 0.15 * no_rest_score
     )
 
 
@@ -108,33 +108,33 @@ def snare_pattern_fitness(rhythm: str) -> float:
 
     if beat_count >= 8:
         # For 8-beat: emphasize beats 3 and 7 (indices 2 and 6)
-        if rhythm[2] != '0':
+        if rhythm[2] != "0":
             backbeat_score += 0.5
-        if rhythm[6] != '0':
+        if rhythm[6] != "0":
             backbeat_score += 0.5
     elif beat_count >= 4:
         # For 4-beat: emphasize beats 2 and 4 (indices 1 and 3)
-        if rhythm[1] != '0':
+        if rhythm[1] != "0":
             backbeat_score += 0.5
-        if beat_count > 3 and rhythm[3] != '0':
+        if beat_count > 3 and rhythm[3] != "0":
             backbeat_score += 0.5
 
     # Sparsity (snare is accent, not filler)
-    rest_ratio = rhythm.count('0') / len(rhythm)
+    rest_ratio = rhythm.count("0") / len(rhythm)
     sparsity_score = min(rest_ratio * 1.3, 1.0)
 
     # Simplicity (prefer single hits)
-    simplicity_score = rhythm.count('1') / max(len(rhythm) - rhythm.count('0'), 1)
+    simplicity_score = rhythm.count("1") / max(len(rhythm) - rhythm.count("0"), 1)
 
     # Not too dense
     density = sum(int(c) for c in rhythm) / (len(rhythm) * 4.0)
     low_density_score = 1.0 - density
 
     return (
-        0.45 * backbeat_score +
-        0.25 * sparsity_score +
-        0.20 * simplicity_score +
-        0.10 * low_density_score
+        0.45 * backbeat_score
+        + 0.25 * sparsity_score
+        + 0.20 * simplicity_score
+        + 0.10 * low_density_score
     )
 
 
@@ -161,18 +161,18 @@ def percussion_pattern_fitness(rhythm: str) -> float:
     variety_score = unique_ratio
 
     # Balance of rests and notes
-    rest_ratio = rhythm.count('0') / len(rhythm)
+    rest_ratio = rhythm.count("0") / len(rhythm)
     balance_score = 1.0 - abs(0.4 - rest_ratio)
 
     # Prefer subdivisions (2s and 3s for texture)
-    subdivision_count = rhythm.count('2') + rhythm.count('3')
+    subdivision_count = rhythm.count("2") + rhythm.count("3")
     subdivision_score = min(subdivision_count / len(rhythm) * 2, 1.0)
 
     return (
-        0.30 * density_score +
-        0.25 * variety_score +
-        0.25 * balance_score +
-        0.20 * subdivision_score
+        0.30 * density_score
+        + 0.25 * variety_score
+        + 0.25 * balance_score
+        + 0.20 * subdivision_score
     )
 
 
@@ -193,9 +193,9 @@ def rock_kick_fitness(rhythm: str) -> float:
     density_score = 1.0 - abs(density - target_density) / max(target_density, 0.1)
 
     return (
-        0.50 * downbeat_score +  # Strong downbeats
-        0.30 * density_score +  # Moderate density
-        0.20 * rhythm_consistency(rhythm)  # Consistent pattern
+        0.50 * downbeat_score  # Strong downbeats
+        + 0.30 * density_score  # Moderate density
+        + 0.20 * rhythm_consistency(rhythm)  # Consistent pattern
     )
 
 
@@ -212,9 +212,9 @@ def metal_kick_fitness(rhythm: str) -> float:
     density_score = min(density / 0.4, 1.0)  # Target 40%+ density
 
     return (
-        0.50 * fast_score +  # Fast double bass patterns
-        0.35 * density_score +  # High density
-        0.15 * rhythm_complexity(rhythm)  # Complex patterns
+        0.50 * fast_score  # Fast double bass patterns
+        + 0.35 * density_score  # High density
+        + 0.15 * rhythm_complexity(rhythm)  # Complex patterns
     )
 
 
@@ -228,9 +228,9 @@ def jazz_kick_fitness(rhythm: str) -> float:
     density_score = 1.0 - abs(density - target_density) / 0.3
 
     return (
-        0.40 * rhythm_syncopation(rhythm) +  # Highly syncopated
-        0.35 * rhythm_complexity(rhythm) +  # Varied patterns
-        0.25 * density_score  # Moderate-low density
+        0.40 * rhythm_syncopation(rhythm)  # Highly syncopated
+        + 0.35 * rhythm_complexity(rhythm)  # Varied patterns
+        + 0.25 * density_score  # Moderate-low density
     )
 
 
@@ -246,9 +246,9 @@ def electronic_kick_fitness(rhythm: str) -> float:
     consistency = rhythm_consistency(rhythm)
 
     return (
-        0.50 * four_on_floor_score +  # Every beat or regular pattern
-        0.35 * consistency +  # Very consistent
-        0.15 * rhythm_density(rhythm)  # Moderate density
+        0.50 * four_on_floor_score  # Every beat or regular pattern
+        + 0.35 * consistency  # Very consistent
+        + 0.15 * rhythm_density(rhythm)  # Moderate density
     )
 
 

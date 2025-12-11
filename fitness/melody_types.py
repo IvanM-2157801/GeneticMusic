@@ -1,5 +1,12 @@
 """Fitness functions for different melody types: melodic (varied) vs stable (smooth)."""
-from .base import FitnessFunction, interval_smoothness, note_variety, rest_ratio, scale_adherence
+
+from .base import (
+    FitnessFunction,
+    interval_smoothness,
+    note_variety,
+    rest_ratio,
+    scale_adherence,
+)
 from core.music import Layer, NoteName
 
 
@@ -30,11 +37,11 @@ class MelodicFitness(FitnessFunction):
             interval_variety = self._interval_variety(phrase)
 
             score = (
-                0.30 * interval_variety +  # Favor varied/large intervals
-                0.25 * note_variety(phrase) +  # High note variety
-                0.20 * (1 - interval_smoothness(phrase)) +  # Allow large jumps
-                0.15 * self._octave_usage(phrase) +  # Use wide range
-                0.10 * (1 - rest_penalty)  # Penalize rests more
+                0.30 * interval_variety  # Favor varied/large intervals
+                + 0.25 * note_variety(phrase)  # High note variety
+                + 0.20 * (1 - interval_smoothness(phrase))  # Allow large jumps
+                + 0.15 * self._octave_usage(phrase)  # Use wide range
+                + 0.10 * (1 - rest_penalty)  # Penalize rests more
             )
             scores.append(score)
 
@@ -105,11 +112,12 @@ class StableFitness(FitnessFunction):
                 rest_penalty = 0.5  # Cap the penalty
 
             score = (
-                0.35 * interval_smoothness(phrase) +  # Very smooth
-                0.25 * self._stepwise_motion(phrase) +  # Prefer steps over jumps
-                0.15 * scale_adherence(phrase, self._get_major_scale()) +  # Stay in scale
-                0.10 * self._narrow_range(phrase) +  # Stay in narrow range
-                0.15 * (1 - rest_penalty)  # Penalize rests more
+                0.35 * interval_smoothness(phrase)  # Very smooth
+                + 0.25 * self._stepwise_motion(phrase)  # Prefer steps over jumps
+                + 0.15
+                * scale_adherence(phrase, self._get_major_scale())  # Stay in scale
+                + 0.10 * self._narrow_range(phrase)  # Stay in narrow range
+                + 0.15 * (1 - rest_penalty)  # Penalize rests more
             )
             scores.append(score)
 
@@ -150,8 +158,15 @@ class StableFitness(FitnessFunction):
 
     def _get_major_scale(self):
         """Get major scale notes."""
-        return [NoteName.C, NoteName.D, NoteName.E, NoteName.F,
-                NoteName.G, NoteName.A, NoteName.B]
+        return [
+            NoteName.C,
+            NoteName.D,
+            NoteName.E,
+            NoteName.F,
+            NoteName.G,
+            NoteName.A,
+            NoteName.B,
+        ]
 
 
 class ChordFitness(FitnessFunction):
@@ -184,10 +199,10 @@ class ChordFitness(FitnessFunction):
             sustained_score = 1.0 - note_variety(phrase)
 
             score = (
-                0.35 * triadic_score +  # Favor thirds and fifths
-                0.25 * sustained_score +  # Sustained/repeated notes
-                0.20 * self._narrow_range(phrase) +  # Stay in narrow range
-                0.15 * (1 - rest_penalty)  # Penalize rests
+                0.35 * triadic_score  # Favor thirds and fifths
+                + 0.25 * sustained_score  # Sustained/repeated notes
+                + 0.20 * self._narrow_range(phrase)  # Stay in narrow range
+                + 0.15 * (1 - rest_penalty)  # Penalize rests
                 + 0.05 * interval_smoothness(phrase)  # Some smoothness
             )
             scores.append(score)
@@ -202,7 +217,12 @@ class ChordFitness(FitnessFunction):
         if len(notes) < 2:
             return 0.0
 
-        triadic_intervals = {3, 4, 7, 8}  # Minor third, major third, perfect fifth, minor sixth
+        triadic_intervals = {
+            3,
+            4,
+            7,
+            8,
+        }  # Minor third, major third, perfect fifth, minor sixth
         triadic_count = 0
         total_intervals = 0
 

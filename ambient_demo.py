@@ -1,4 +1,5 @@
 """Ambient demo with sustained melodies and optional chord mode."""
+
 import base64
 from layered_composer import LayeredComposer, LayerConfig
 from fitness.rhythm import RHYTHM_FITNESS_FUNCTIONS
@@ -56,7 +57,6 @@ def main():
             gain=0.4,
             lpf=4000,
             use_scale_degrees=True,
-            chord_mode=True,  # Use comma-separated notes for chords
         )
     )
 

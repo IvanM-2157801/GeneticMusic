@@ -25,7 +25,7 @@ def main():
     print()
 
     composer = LayeredComposer(
-        population_size=25,
+        population_size=100,
         mutation_rate=0.25,
         elitism_count=7,
         rhythm_generations=25,
@@ -69,8 +69,8 @@ def main():
             name="hihat",
             instrument="hh",
             bars=1,
-            beats_per_bar=8,
-            max_subdivision=2,
+            beats_per_bar=4,
+            max_subdivision=3,
             rhythm_fitness_fn=DRUM_GENRE_FUNCTIONS["electronic"]["hihat"],
             is_drum=True,
             drum_sound="hh",
@@ -101,62 +101,18 @@ def main():
             name="bass",
             instrument="sawtooth",
             bars=1,
-            beats_per_bar=8,
-            max_subdivision=2,
+            beats_per_bar=16,
+            max_subdivision=4,
             octave_range=(2, 3),
-            scale=c_minor,
-            rhythm_fitness_fn=RHYTHM_FITNESS_FUNCTIONS["bass"],
-            melody_fitness_fn=StableFitness(),
-            strudel_scale="",
-            octave_shift=-14,  # Very low
-            gain=0.6,
-            lpf=600,  # Deep bass
-            use_scale_degrees=True,
-        )
-    )
-
-    # === LAYER 3: PAD (fits with bass and drums) ===
-
-    print("Adding pad (will complement bass and drums)...")
-    composer.add_layer(
-        LayerConfig(
-            name="pad",
-            instrument="triangle",
-            bars=1,
-            beats_per_bar=8,
-            max_subdivision=2,
-            octave_range=(3, 5),
             scale=c_minor,
             rhythm_fitness_fn=RHYTHM_FITNESS_FUNCTIONS["ambient"],
             melody_fitness_fn=ChordFitness(),
             strudel_scale="",
-            octave_shift=0,
-            gain=0.3,
-            lpf=3000,  # Warm pad
+            octave_shift=-7,  # Very low
+            gain=0.6,
+            lpf=600,  # Deep bass
             use_scale_degrees=True,
-            chord_mode=True,  # Sustained chords
-        )
-    )
-
-    # === LAYER 4: LEAD (fits with everything) ===
-
-    print("Adding lead (will fit with the full arrangement)...")
-    composer.add_layer(
-        LayerConfig(
-            name="lead",
-            instrument="square",
-            bars=1,
-            beats_per_bar=8,
-            max_subdivision=3,
-            octave_range=(5, 6),
-            scale=c_minor,
-            rhythm_fitness_fn=RHYTHM_FITNESS_FUNCTIONS["funk"],
-            melody_fitness_fn=StableFitness(),
-            strudel_scale="",
-            octave_shift=7,
-            gain=0.4,
-            lpf=5000,  # Bright lead
-            use_scale_degrees=True,
+            chord_mode=True,
         )
     )
 
