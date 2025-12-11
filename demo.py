@@ -253,6 +253,25 @@ def main():
     )
     composer.add_layer(melody_config)
 
+    melody_config = LayerConfig(
+        name="bassline",
+        instrument="supersaw",
+        bars=BARS,
+        beats_per_bar=4,
+        max_subdivision=1,
+        octave_range=(2, 4),
+        rhythm_fitness_fn=my_rhythm_fitness,
+        melody_fitness_fn=MyMelodyFitness(),
+        layer_role="melody",
+        gain=0.3,
+        lpf=150,
+        room=0.8,
+        postgain=2,
+        use_scale_degrees=True,
+    )
+
+    composer.add_layer(melody_config)
+
     # Evolve!
     print("Evolving...")
     composer.evolve_all_layers(verbose=True)

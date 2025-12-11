@@ -140,6 +140,7 @@ class Phrase:
         scale_degrees: bool = False,
         drum_sound: str = None,
         chord_mode: bool = False,
+        base_octave: int = 4,
     ) -> str:
         """Convert phrase to Strudel notation preserving rhythm structure.
 
@@ -151,6 +152,9 @@ class Phrase:
             scale_degrees: If True, use scale degrees 0-7 instead of note names
             drum_sound: If set, uses this drum sound name (e.g., "bd", "hh", "sd")
             chord_mode: If True, uses comma separation for parallel notes (chords)
+            base_octave: Base octave for scale degree calculation (default 4).
+                         Notes above this octave add +7 per octave to the degree,
+                         notes below subtract -7 per octave.
         """
         beat_groups = []
         note_idx = 0
@@ -176,7 +180,10 @@ class Phrase:
                                     beat_notes.append("~")
                                 else:
                                     degree = note.pitch.value % 7
-                                    beat_notes.append(str(degree))
+                                    # Add octave offset: +7 per octave above base, -7 per octave below
+                                    octave_offset = (note.octave - base_octave) * 7
+                                    final_degree = degree + octave_offset
+                                    beat_notes.append(str(final_degree))
                             else:
                                 beat_notes.append(note.to_strudel())
                             note_idx += 1
@@ -230,6 +237,7 @@ class Layer:
     is_chord_layer: bool = (
         False  # If True, this layer plays chords from chord_progression
     )
+    base_octave: int = 4  # Base octave for scale degree calculation
 
     def _build_effects_chain(self) -> str:
         """Build the effects chain for Strudel output."""
@@ -332,7 +340,10 @@ class Layer:
                 # Use rhythm-aware formatting for each phrase
                 patterns = [
                     p.to_strudel_with_rhythm(
-                        self.rhythm, self.use_scale_degrees, chord_mode=self.chord_mode
+                        self.rhythm,
+                        self.use_scale_degrees,
+                        chord_mode=self.chord_mode,
+                        base_octave=self.base_octave,
                     )
                     for p in self.phrases
                 ]

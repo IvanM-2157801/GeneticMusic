@@ -70,6 +70,7 @@ class LayerConfig:
     # Other
     use_scale_degrees: bool = True  # Use 0-7 scale degrees
     chord_mode: bool = False  # Use comma-separated notes for chords
+    base_octave: int = 4  # Base octave for scale degree calculation (notes at this octave output 0-6)
     # Drum parameters
     is_drum: bool = False  # If True, only evolves rhythm (no melody)
     drum_sound: str = ""  # Drum sound name (e.g., "bd", "hh", "sd")
@@ -609,6 +610,7 @@ class LayeredComposer:
                         release=config.release,
                         use_scale_degrees=config.use_scale_degrees,
                         chord_mode=config.chord_mode,
+                        base_octave=config.base_octave,
                     )
                     layers.append(layer)
 
