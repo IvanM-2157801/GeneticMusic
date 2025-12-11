@@ -6,6 +6,10 @@ This demo shows how to create a composition with:
 - A bass layer (following the chord roots)
 """
 
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+
 from layered_composer import LayeredComposer, LayerConfig
 from core.music import NoteName
 from fitness.chords import PopChordFitness, JazzChordFitness

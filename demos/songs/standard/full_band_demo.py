@@ -1,5 +1,9 @@
 """Complete band demo with drums and melodic instruments."""
 
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
+
 import base64
 from layered_composer import LayeredComposer, LayerConfig
 from fitness.rhythm import RHYTHM_FITNESS_FUNCTIONS

@@ -1,4 +1,9 @@
 """Demo of drum system with multiple drum layers."""
+
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+
 import base64
 from layered_composer import LayeredComposer, LayerConfig
 from fitness.drums import DRUM_FITNESS_FUNCTIONS
