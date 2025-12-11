@@ -39,3 +39,19 @@ from .rhythm import (
     bass_rhythm_fitness,
     RHYTHM_FITNESS_FUNCTIONS,
 )
+from .chords import (
+    ChordFitnessFunction,
+    chord_variety,
+    chord_type_variety,
+    root_motion_smoothness,
+    functional_harmony_score,
+    resolution_bonus,
+    PopChordFitness,
+    JazzChordFitness,
+    BluesChordFitness,
+    RockChordFitness,
+    MetalChordFitness,
+    AmbientChordFitness,
+    ElectronicChordFitness,
+    CHORD_FITNESS_FUNCTIONS,
+)

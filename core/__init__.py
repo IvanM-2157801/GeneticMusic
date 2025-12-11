@@ -10,4 +10,14 @@ from .genome_ops import (
     mutate_layer,
     crossover_phrase,
     crossover_layer,
+    # Chord operations
+    Chord,
+    ChordProgression,
+    CHORD_TYPES,
+    COMMON_PROGRESSIONS,
+    random_chord,
+    random_chord_progression,
+    mutate_chord,
+    mutate_chord_progression,
+    crossover_chord_progression,
 )

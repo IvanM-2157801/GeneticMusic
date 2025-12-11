@@ -123,6 +123,8 @@ class Layer:
     is_drum: bool = False  # If True, uses sound() instead of n()
     drum_sound: str = ""  # Drum sound name (e.g., "bd", "hh", "sd")
     chord_mode: bool = False  # If True, uses comma-separated notes for chords
+    chord_progression: list = field(default_factory=list)  # List of Chord objects
+    is_chord_layer: bool = False  # If True, this layer plays chords from chord_progression
 
     def to_strudel(self) -> str:
         """Convert layer to Strudel notation.
@@ -151,6 +153,32 @@ class Layer:
             # Build drum expression
             result = f'sound("{pattern}")'
             result += f'.gain({self.gain})'
+            return result
+
+        elif self.is_chord_layer and self.chord_progression:
+            # Chord layer: output chords as comma-separated scale degrees
+            pattern = self._chord_progression_to_strudel()
+            
+            # Build Strudel expression
+            result = f'n("{pattern}")'
+            
+            # Add octave shift if specified
+            if self.octave_shift != 0:
+                result += f'.sub({abs(self.octave_shift)})'
+            
+            # Add scale
+            result += f'.scale("{self.scale}")'
+            
+            # Add instrument
+            result += f'.s("{self.instrument}")'
+            
+            # Add gain
+            result += f'.gain({self.gain})'
+            
+            # Add low-pass filter
+            if self.lpf:
+                result += f'.lpf({self.lpf})'
+            
             return result
 
         else:
@@ -185,6 +213,47 @@ class Layer:
 
             return result
 
+    def _chord_progression_to_strudel(self) -> str:
+        """Convert chord progression to Strudel notation.
+        
+        Each chord becomes a group of comma-separated scale degrees.
+        Example: [Chord(0, [0,4,7]), Chord(4, [0,4,7])] -> "[0, 2, 4] [4, 6, 1]"
+        """
+        if not self.chord_progression:
+            return "0"
+        
+        chord_strs = []
+        for chord in self.chord_progression:
+            # Convert chord to scale degrees
+            # Each interval maps to a scale degree offset from the root
+            degrees = []
+            for interval in chord.intervals:
+                # Approximate: semitone intervals to scale degrees
+                # 0=root, 3-4=3rd, 7=5th, 10-11=7th, 14=9th
+                if interval == 0:
+                    degree = chord.root_degree
+                elif interval in (3, 4):
+                    degree = (chord.root_degree + 2) % 7  # 3rd
+                elif interval in (5,):
+                    degree = (chord.root_degree + 3) % 7  # 4th
+                elif interval in (7, 8):
+                    degree = (chord.root_degree + 4) % 7  # 5th
+                elif interval in (10, 11):
+                    degree = (chord.root_degree + 6) % 7  # 7th
+                elif interval >= 12:
+                    degree = (chord.root_degree + (interval - 12) // 2) % 7
+                else:
+                    # For sus2, etc.
+                    degree = (chord.root_degree + interval // 2) % 7
+                degrees.append(str(degree))
+            
+            if len(degrees) == 1:
+                chord_strs.append(degrees[0])
+            else:
+                chord_strs.append("[" + ", ".join(degrees) + "]")
+        
+        return " ".join(chord_strs)
+
 
 @dataclass
 class Composition:
@@ -196,6 +265,13 @@ class Composition:
         lines = [f"setcpm({self.bpm / 4})", ""]  # cpm = cycles per minute
         lines.extend(f"$: {layer.to_strudel()}" for layer in self.layers)
         return "\n".join(lines)
+
+    def to_strudel_link(self) -> str:
+        """Generate a Strudel REPL link for this composition."""
+        import base64
+        strudel_code = self.to_strudel()
+        encoded = base64.b64encode(strudel_code.encode('utf-8')).decode('utf-8')
+        return f"https://strudel.cc/#{encoded}"
 
     @staticmethod
     def random_scale() -> str:
