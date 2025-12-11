@@ -36,6 +36,7 @@
           
           darwinPackages = with pkgs; [
             # Add macOS-specific packages here if needed
+            pyright
           ];
           
           allPackages = commonPackages 

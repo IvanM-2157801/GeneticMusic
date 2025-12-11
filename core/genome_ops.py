@@ -9,12 +9,15 @@ REST_PROBABILITY = 0.4
 # Rhythm genome is a string where each char represents subdivisions per beat
 # '0' = rest, '1' = 1 note, '2' = 2 notes (eighth notes), '3' = triplet, '4' = 4 notes (sixteenths)
 
+
 def random_rhythm(num_beats: int, max_subdivision: int = 4) -> str:
     """Generate a random rhythm pattern."""
     return "".join(str(random.randint(0, max_subdivision)) for _ in range(num_beats))
 
 
-def mutate_rhythm(rhythm: str, mutation_rate: float = 0.1, max_subdivision: int = 4) -> str:
+def mutate_rhythm(
+    rhythm: str, mutation_rate: float = 0.1, max_subdivision: int = 4
+) -> str:
     """Mutate a rhythm pattern."""
     chars = list(rhythm)
     for i in range(len(chars)):
@@ -39,8 +42,16 @@ def rhythm_to_phrase(
 ) -> Phrase:
     """Convert a rhythm pattern to a Phrase with random pitches."""
     if scale is None:
-        scale = [NoteName.C, NoteName.D, NoteName.E, NoteName.F, NoteName.G, NoteName.A, NoteName.B]
-    
+        scale = [
+            NoteName.C,
+            NoteName.D,
+            NoteName.E,
+            NoteName.F,
+            NoteName.G,
+            NoteName.A,
+            NoteName.B,
+        ]
+
     notes = []
     for beat_char in rhythm:
         subdivisions = int(beat_char)
@@ -54,7 +65,7 @@ def rhythm_to_phrase(
                 pitch = random.choice(scale)
                 octave = random.randint(*octave_range)
                 notes.append(Note(pitch, octave=octave, duration=duration))
-    
+
     return Phrase(notes)
 
 
@@ -66,7 +77,7 @@ def phrase_with_rhythm(
     # Extract pitches from the phrase (ignoring rests)
     pitches = [(n.pitch, n.octave) for n in phrase.notes if n.pitch != NoteName.REST]
     pitch_idx = 0
-    
+
     notes = []
     for beat_char in rhythm:
         subdivisions = int(beat_char)
@@ -80,14 +91,19 @@ def phrase_with_rhythm(
                     pitch_idx += 1
                 else:
                     # Wrap around if we run out of pitches
-                    pitch, octave = pitches[pitch_idx % len(pitches)] if pitches else (NoteName.C, 4)
+                    pitch, octave = (
+                        pitches[pitch_idx % len(pitches)]
+                        if pitches
+                        else (NoteName.C, 4)
+                    )
                     pitch_idx += 1
                 notes.append(Note(pitch, octave=octave, duration=duration))
-    
+
     return Phrase(notes)
 
 
 # === Note Operations ===
+
 
 def random_note(
     scale: list[NoteName] | None = None,
@@ -95,15 +111,15 @@ def random_note(
 ) -> Note:
     if random.random() < REST_PROBABILITY:
         return Note(NoteName.REST)
-    
+
     if scale is None:
         scale = list(NoteName)
         scale.remove(NoteName.REST)
-    
+
     return Note(
         pitch=random.choice(scale),
         octave=random.randint(*octave_range),
-        duration=random.choice([0.25, 0.5, 1.0, 2.0])
+        duration=random.choice([0.25, 0.5, 1.0, 2.0]),
     )
 
 
@@ -120,17 +136,20 @@ def random_layer(
 ) -> Layer:
     return Layer(
         name=name,
-        phrases=[random_phrase(phrase_length, **note_kwargs) for _ in range(phrase_count)],
+        phrases=[
+            random_phrase(phrase_length, **note_kwargs) for _ in range(phrase_count)
+        ],
         instrument=instrument,
     )
 
 
 # === Mutation Operations ===
 
+
 def mutate_note(note: Note, scale: list[NoteName] | None = None) -> Note:
     mutation_type = random.choice(["pitch", "octave", "duration"])
     new_note = deepcopy(note)
-    
+
     if mutation_type == "pitch":
         if scale:
             new_note.pitch = random.choice(scale)
@@ -141,7 +160,7 @@ def mutate_note(note: Note, scale: list[NoteName] | None = None) -> Note:
         new_note.octave = max(1, min(7, new_note.octave + random.choice([-1, 1])))
     elif mutation_type == "duration":
         new_note.duration = random.choice([0.25, 0.5, 1.0, 2.0])
-    
+
     return new_note
 
 
@@ -163,14 +182,12 @@ def mutate_layer(layer: Layer, mutation_rate: float = 0.1) -> Layer:
     )
 
 
-# === Crossover Operations ===
-
 # TODO: crossover with multiple parents?
 def crossover_phrase(p1: Phrase, p2: Phrase) -> Phrase:
     min_len = min(len(p1.notes), len(p2.notes))
     if min_len < 2:
         return deepcopy(p1)
-    
+
     point = random.randint(1, min_len - 1)
     return Phrase(deepcopy(p1.notes[:point]) + deepcopy(p2.notes[point:min_len]))
 
@@ -178,8 +195,7 @@ def crossover_phrase(p1: Phrase, p2: Phrase) -> Phrase:
 def crossover_layer(l1: Layer, l2: Layer) -> Layer:
     min_phrases = min(len(l1.phrases), len(l2.phrases))
     new_phrases = [
-        crossover_phrase(l1.phrases[i], l2.phrases[i])
-        for i in range(min_phrases)
+        crossover_phrase(l1.phrases[i], l2.phrases[i]) for i in range(min_phrases)
     ]
     return Layer(name=l1.name, phrases=new_phrases, instrument=l1.instrument)
 
@@ -217,29 +233,32 @@ COMMON_PROGRESSIONS = {
 @dataclass
 class Chord:
     """Represents a single chord with root and intervals."""
+
     root_degree: int  # Scale degree (0-6) for the root
     intervals: list[int]  # Semitones from root (e.g., [0, 4, 7] for major)
-    
+
     def to_strudel_notes(self, octave: int = 4) -> str:
         """Convert chord to Strudel notation (comma-separated scale degrees)."""
         # For scale-degree mode, we just output the degrees offset by root
-        degrees = [str((self.root_degree + (interval // 2)) % 7) for interval in self.intervals]
+        degrees = [
+            str((self.root_degree + (interval // 2)) % 7) for interval in self.intervals
+        ]
         return ", ".join(degrees)
 
 
 @dataclass
 class ChordProgression:
     """A sequence of chords for a layer."""
+
     chords: list[Chord]
-    
+
     def __len__(self) -> int:
         return len(self.chords)
-    
+
     def copy(self) -> "ChordProgression":
-        return ChordProgression([
-            Chord(c.root_degree, c.intervals.copy()) 
-            for c in self.chords
-        ])
+        return ChordProgression(
+            [Chord(c.root_degree, c.intervals.copy()) for c in self.chords]
+        )
 
 
 def random_chord(
@@ -247,13 +266,13 @@ def random_chord(
     allowed_types: list[str] | None = None,
 ) -> Chord:
     """Generate a random chord.
-    
+
     Args:
         notes_per_chord: Number of notes in the chord (2-4 typically)
         allowed_types: List of chord type names to choose from, or None for any
     """
     root_degree = random.randint(0, 6)
-    
+
     if allowed_types:
         chord_type = random.choice(allowed_types)
         intervals = CHORD_TYPES.get(chord_type, [0, 4, 7])[:notes_per_chord]
@@ -264,24 +283,28 @@ def random_chord(
             intervals = [0, random.choice([3, 4, 5, 7])]
         elif notes_per_chord == 3:
             # Triads
-            intervals = random.choice([
-                [0, 4, 7],   # major
-                [0, 3, 7],   # minor
-                [0, 3, 6],   # dim
-                [0, 4, 8],   # aug
-                [0, 2, 7],   # sus2
-                [0, 5, 7],   # sus4
-            ])
+            intervals = random.choice(
+                [
+                    [0, 4, 7],  # major
+                    [0, 3, 7],  # minor
+                    [0, 3, 6],  # dim
+                    [0, 4, 8],  # aug
+                    [0, 2, 7],  # sus2
+                    [0, 5, 7],  # sus4
+                ]
+            )
         else:
             # 4+ notes: 7th chords and extensions
-            base = random.choice([
-                [0, 4, 7, 11],  # maj7
-                [0, 3, 7, 10],  # min7
-                [0, 4, 7, 10],  # dom7
-                [0, 3, 6, 9],   # dim7
-            ])
+            base = random.choice(
+                [
+                    [0, 4, 7, 11],  # maj7
+                    [0, 3, 7, 10],  # min7
+                    [0, 4, 7, 10],  # dom7
+                    [0, 3, 6, 9],  # dim7
+                ]
+            )
             intervals = base[:notes_per_chord]
-    
+
     return Chord(root_degree, intervals)
 
 
@@ -291,7 +314,7 @@ def random_chord_progression(
     allowed_types: list[str] | None = None,
 ) -> ChordProgression:
     """Generate a random chord progression.
-    
+
     Args:
         num_chords: Number of chords in the progression
         notes_per_chord: Number of notes per chord
@@ -304,34 +327,34 @@ def random_chord_progression(
 def mutate_chord(chord: Chord, notes_per_chord: int = 3) -> Chord:
     """Mutate a single chord."""
     new_chord = Chord(chord.root_degree, chord.intervals.copy())
-    
+
     mutation_type = random.choice(["root", "type", "voicing"])
-    
+
     if mutation_type == "root":
         # Change root by step or skip
         step = random.choice([-2, -1, 1, 2])
         new_chord.root_degree = (new_chord.root_degree + step) % 7
-    
+
     elif mutation_type == "type":
         # Change chord quality
         if notes_per_chord == 2:
             new_chord.intervals = [0, random.choice([3, 4, 5, 7])]
         elif notes_per_chord == 3:
-            new_chord.intervals = random.choice([
-                [0, 4, 7], [0, 3, 7], [0, 3, 6], [0, 4, 8], [0, 2, 7], [0, 5, 7]
-            ])
+            new_chord.intervals = random.choice(
+                [[0, 4, 7], [0, 3, 7], [0, 3, 6], [0, 4, 8], [0, 2, 7], [0, 5, 7]]
+            )
         else:
-            new_chord.intervals = random.choice([
-                [0, 4, 7, 11], [0, 3, 7, 10], [0, 4, 7, 10], [0, 3, 6, 9]
-            ])[:notes_per_chord]
-    
+            new_chord.intervals = random.choice(
+                [[0, 4, 7, 11], [0, 3, 7, 10], [0, 4, 7, 10], [0, 3, 6, 9]]
+            )[:notes_per_chord]
+
     elif mutation_type == "voicing":
         # Shift one interval slightly
         if len(new_chord.intervals) > 1:
             idx = random.randint(1, len(new_chord.intervals) - 1)
             shift = random.choice([-1, 1])
             new_chord.intervals[idx] = max(1, new_chord.intervals[idx] + shift)
-    
+
     return new_chord
 
 
@@ -375,9 +398,11 @@ def crossover_chord_progression(
 # === Dynamic Envelope Operations ===
 # Envelope genome is a list of (time, value) points
 
+
 @dataclass
 class EnvelopeGenome:
     """Genome for dynamic/filter envelope evolution."""
+
     points: list[tuple[float, float]]  # (time_fraction 0-1, value)
     min_value: float = 0.0
     max_value: float = 1.0
@@ -545,6 +570,7 @@ def _interpolate_envelope(points: list[tuple[float, float]], time: float) -> flo
 
 # === Phrase Variation Operations ===
 # For musical development (theme and variations)
+
 
 def phrase_similarity(phrase1: Phrase, phrase2: Phrase) -> float:
     """Calculate similarity between two phrases.
@@ -765,7 +791,7 @@ def generate_response(
     elif response_type == "echo":
         # Shorter version (take first half)
         mid = len(notes) // 2
-        notes = notes[:max(mid, 2)]
+        notes = notes[: max(mid, 2)]
         # Lower octave
         for note in notes:
             if note.pitch != NoteName.REST:
