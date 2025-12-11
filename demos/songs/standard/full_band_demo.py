@@ -47,9 +47,9 @@ def main():
         LayerConfig(
             name="melody",
             instrument="piano",
-            bars=2,
+            bars=1,
             beats_per_bar=4,
-            max_subdivision=2,
+            max_subdivision=3,
             octave_range=(4, 6),
             scale=c_major,
             rhythm_fitness_fn=RHYTHM_FITNESS_FUNCTIONS["funk"],
@@ -59,6 +59,7 @@ def main():
             gain=0.3,
             lpf=8000,
             use_scale_degrees=True,
+            chord_mode=True,
         )
     )
 

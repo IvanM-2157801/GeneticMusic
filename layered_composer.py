@@ -45,7 +45,9 @@ class LayerConfig:
     is_drum: bool = False  # If True, only evolves rhythm (no melody)
     drum_sound: str = ""  # Drum sound name (e.g., "bd", "hh", "sd")
     # Chord parameters
-    is_chord_layer: bool = False  # If True, evolves chord progressions instead of melody
+    is_chord_layer: bool = (
+        False  # If True, evolves chord progressions instead of melody
+    )
     num_chords: int = 4  # Number of chords in the progression
     notes_per_chord: int = 3  # Number of notes per chord (2=dyad, 3=triad, 4=7th)
     allowed_chord_types: list[str] = None  # e.g., ["major", "minor", "dom7"]
@@ -93,8 +95,12 @@ class LayeredComposer:
         self.layer_configs: list[LayerConfig] = []
         self.evolved_rhythms: dict[str, str] = {}  # layer_name -> rhythm string
         self.evolved_phrases: dict[str, Phrase] = {}  # layer_name -> Phrase
-        self.evolved_chords: dict[str, ChordProgression] = {}  # layer_name -> ChordProgression
-        self.evolved_layers: dict[str, tuple[Layer, str]] = {}  # layer_name -> (Layer, rhythm)
+        self.evolved_chords: dict[str, ChordProgression] = (
+            {}
+        )  # layer_name -> ChordProgression
+        self.evolved_layers: dict[str, tuple[Layer, str]] = (
+            {}
+        )  # layer_name -> (Layer, rhythm)
 
     def add_layer(self, config: LayerConfig) -> None:
         """Add a layer configuration."""
@@ -227,7 +233,9 @@ class LayeredComposer:
         if verbose:
             print(f"\n{'='*60}")
             print(f"Evolving chords for layer: {config.name}")
-            print(f"Num chords: {config.num_chords}, Notes per chord: {config.notes_per_chord}")
+            print(
+                f"Num chords: {config.num_chords}, Notes per chord: {config.notes_per_chord}"
+            )
             print(f"{'='*60}")
 
         ga = GeneticAlgorithm[ChordProgression](
@@ -278,7 +286,9 @@ class LayeredComposer:
                 chord_summary = " → ".join(
                     f"{c.root_degree}({len(c.intervals)})" for c in best.genome.chords
                 )
-                print(f"  Gen {gen:3d}: Best fitness = {best_fitness:.4f}, chords = {chord_summary}")
+                print(
+                    f"  Gen {gen:3d}: Best fitness = {best_fitness:.4f}, chords = {chord_summary}"
+                )
 
         best_progression = population[0].genome
         if verbose:
@@ -381,16 +391,18 @@ class LayeredComposer:
                         drum_sound=config.drum_sound,
                     )
                     layers.append(layer)
-            
+
             elif config.is_chord_layer:
                 # Chord layer: uses chord progression
                 chord_progression = self.evolved_chords.get(config.name)
                 if chord_progression:
                     # Use config scale if specified, otherwise use composition scale
                     layer_scale = (
-                        config.strudel_scale if config.strudel_scale else composition_scale
+                        config.strudel_scale
+                        if config.strudel_scale
+                        else composition_scale
                     )
-                    
+
                     layer = Layer(
                         name=config.name,
                         phrases=[],
@@ -404,14 +416,16 @@ class LayeredComposer:
                         chord_progression=chord_progression.chords,
                     )
                     layers.append(layer)
-            
+
             else:
                 # Melodic layer: needs phrases
                 phrase = self.evolved_phrases.get(config.name)
                 if phrase:
                     # Use config scale if specified, otherwise use composition scale
                     layer_scale = (
-                        config.strudel_scale if config.strudel_scale else composition_scale
+                        config.strudel_scale
+                        if config.strudel_scale
+                        else composition_scale
                     )
 
                     layer = Layer(
@@ -448,9 +462,9 @@ class LayeredComposer:
             rhythm = self.evolved_rhythms.get(config.name, "Not evolved")
             phrase = self.evolved_phrases.get(config.name)
             chord_prog = self.evolved_chords.get(config.name)
-            
+
             print(f"\n{config.name.upper()} ({config.instrument}):")
-            
+
             if config.is_chord_layer:
                 print(f"  Type: Chord Layer")
                 if chord_prog:
