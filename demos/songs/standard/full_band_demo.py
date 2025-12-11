@@ -50,7 +50,7 @@ def main():
     composer.add_layer(
         LayerConfig(
             name="melody",
-            instrument="piano",
+            instrument="square",
             bars=1,
             beats_per_bar=4,
             max_subdivision=3,
@@ -71,8 +71,8 @@ def main():
     print("Adding synth pad layer...")
     composer.add_layer(
         LayerConfig(
-            name="piano",
-            instrument="piano",
+            name="synth_pad",
+            instrument="sawtooth",
             bars=1,
             beats_per_bar=8,
             max_subdivision=2,

@@ -2,6 +2,7 @@
 
 import sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 import base64
@@ -82,20 +83,20 @@ def main():
         )
     )
 
-    # Snare - backbeat
-    composer.add_layer(
-        LayerConfig(
-            name="snare",
-            instrument="sd",
-            bars=1,
-            beats_per_bar=8,
-            max_subdivision=1,
-            rhythm_fitness_fn=DRUM_GENRE_FUNCTIONS["electronic"]["snare"],
-            is_drum=True,
-            drum_sound="sd",
-            gain=0.7,
-        )
-    )
+    # # Snare - backbeat
+    # composer.add_layer(
+    #     LayerConfig(
+    #         name="snare",
+    #         instrument="sd",
+    #         bars=1,
+    #         beats_per_bar=8,
+    #         max_subdivision=1,
+    #         rhythm_fitness_fn=DRUM_GENRE_FUNCTIONS["electronic"]["snare"],
+    #         is_drum=True,
+    #         drum_sound="sd",
+    #         gain=0.7,
+    #     )
+    # )
 
     # === LAYER 2: BASS (fits with drums) ===
 
