@@ -72,15 +72,16 @@ def chord_to_numeral(root: int, intervals: list[int]) -> str:
 def test_progression(name: str, prog: ChordProgression):
     """Test all chord fitness functions on a single progression."""
     print(f"\n  {name}:")
-    chord_strs = [
-        chord_to_numeral(c.root_degree, c.intervals)
-        for c in prog.chords
-    ]
+    chord_strs = [chord_to_numeral(c.root_degree, c.intervals) for c in prog.chords]
     print(f"    Chords: {' → '.join(chord_strs)}")
     print(f"    chord_variety:      {chord_variety(prog):.3f}  (root variety)")
     print(f"    chord_type_variety: {chord_type_variety(prog):.3f}  (quality variety)")
-    print(f"    root_motion:        {root_motion_smoothness(prog):.3f}  (smooth motion)")
-    print(f"    functional_harmony: {functional_harmony_score(prog):.3f}  (I/IV/V usage)")
+    print(
+        f"    root_motion:        {root_motion_smoothness(prog):.3f}  (smooth motion)"
+    )
+    print(
+        f"    functional_harmony: {functional_harmony_score(prog):.3f}  (I/IV/V usage)"
+    )
     print(f"    resolution_bonus:   {resolution_bonus(prog):.3f}  (V-I patterns)")
     print(f"    triadic_bonus:      {triadic_bonus(prog):.3f}  (simple triads)")
     print(f"    seventh_chord:      {seventh_chord_bonus(prog):.3f}  (7th chords)")
@@ -92,79 +93,96 @@ def main():
     print("\nChord types available:", list(CHORD_TYPES.keys()))
 
     # Classic I-IV-V-I progression
-    classic_pop = make_progression([
-        (0, "major"),   # I
-        (3, "major"),   # IV
-        (4, "major"),   # V
-        (0, "major"),   # I
-    ])
+    classic_pop = make_progression(
+        [
+            (0, "major"),  # I
+            (3, "major"),  # IV
+            (4, "major"),  # V
+            (0, "major"),  # I
+        ]
+    )
     test_progression("I - IV - V - I (classic pop)", classic_pop)
 
     # Jazz ii-V-I
-    jazz_251 = make_progression([
-        (1, "minor7"),  # ii7
-        (4, "dom7"),    # V7
-        (0, "maj7"),    # Imaj7
-    ])
+    jazz_251 = make_progression(
+        [
+            (1, "minor7"),  # ii7
+            (4, "dom7"),  # V7
+            (0, "maj7"),  # Imaj7
+        ]
+    )
     test_progression("ii7 - V7 - Imaj7 (jazz)", jazz_251)
 
     # Same chord repeated
-    repeated = make_progression([
-        (0, "major"),
-        (0, "major"),
-        (0, "major"),
-        (0, "major"),
-    ])
+    repeated = make_progression(
+        [
+            (0, "major"),
+            (0, "major"),
+            (0, "major"),
+            (0, "major"),
+        ]
+    )
     test_progression("I - I - I - I (static)", repeated)
 
     # Chromatic/unusual root motion
-    chromatic_roots = make_progression([
-        (0, "major"),   # I
-        (1, "major"),   # II (unusual)
-        (2, "major"),   # III (unusual)
-        (3, "major"),   # IV
-    ])
+    chromatic_roots = make_progression(
+        [
+            (0, "major"),  # I
+            (1, "major"),  # II (unusual)
+            (2, "major"),  # III (unusual)
+            (3, "major"),  # IV
+        ]
+    )
     test_progression("I - II - III - IV (chromatic)", chromatic_roots)
 
     # Circle of fifths
-    circle_fifths = make_progression([
-        (0, "major"),   # I
-        (3, "major"),   # IV
-        (6, "minor"),   # vii
-        (2, "minor"),   # iii
-    ])
+    circle_fifths = make_progression(
+        [
+            (0, "major"),  # I
+            (3, "major"),  # IV
+            (6, "minor"),  # vii
+            (2, "minor"),  # iii
+        ]
+    )
     test_progression("I - IV - vii - iii (circle)", circle_fifths)
 
     # All 7th chords
-    all_sevenths = make_progression([
-        (0, "maj7"),
-        (1, "minor7"),
-        (4, "dom7"),
-        (0, "maj7"),
-    ])
+    all_sevenths = make_progression(
+        [
+            (0, "maj7"),
+            (1, "minor7"),
+            (4, "dom7"),
+            (0, "maj7"),
+        ]
+    )
     test_progression("Imaj7 - ii7 - V7 - Imaj7 (all 7ths)", all_sevenths)
 
     # Blues I-IV-I-V
-    blues = make_progression([
-        (0, "dom7"),    # I7
-        (3, "dom7"),    # IV7
-        (0, "dom7"),    # I7
-        (4, "dom7"),    # V7
-    ])
+    blues = make_progression(
+        [
+            (0, "dom7"),  # I7
+            (3, "dom7"),  # IV7
+            (0, "dom7"),  # I7
+            (4, "dom7"),  # V7
+        ]
+    )
     test_progression("I7 - IV7 - I7 - V7 (blues)", blues)
 
     # Modal/ambient (no resolution)
-    modal = make_progression([
-        (0, "sus2"),
-        (5, "minor"),
-        (3, "major"),
-        (5, "minor"),
-    ])
+    modal = make_progression(
+        [
+            (0, "sus2"),
+            (5, "minor"),
+            (3, "major"),
+            (5, "minor"),
+        ]
+    )
     test_progression("Isus2 - vi - IV - vi (modal)", modal)
 
     print_header("CUSTOM CHORD FITNESS EXAMPLE")
     print("\nCombine primitives with weights for custom fitness:")
-    print("""
+    print(
+        """
     # Example: Pop chord fitness
     def pop_chord_fitness(prog: ChordProgression) -> float:
         return (
@@ -182,23 +200,24 @@ def main():
             0.25 * resolution_bonus(prog) +
             0.20 * chord_variety(prog)
         )
-    """)
+    """
+    )
 
     # Test the custom fitness functions
     def pop_chord_fitness(prog: ChordProgression) -> float:
         return (
-            0.35 * functional_harmony_score(prog) +
-            0.25 * triadic_bonus(prog) +
-            0.20 * resolution_bonus(prog) +
-            0.20 * root_motion_smoothness(prog)
+            0.35 * functional_harmony_score(prog)
+            + 0.25 * triadic_bonus(prog)
+            + 0.20 * resolution_bonus(prog)
+            + 0.20 * root_motion_smoothness(prog)
         )
 
     def jazz_chord_fitness(prog: ChordProgression) -> float:
         return (
-            0.30 * seventh_chord_bonus(prog) +
-            0.25 * chord_type_variety(prog) +
-            0.25 * resolution_bonus(prog) +
-            0.20 * chord_variety(prog)
+            0.30 * seventh_chord_bonus(prog)
+            + 0.25 * chord_type_variety(prog)
+            + 0.25 * resolution_bonus(prog)
+            + 0.20 * chord_variety(prog)
         )
 
     print("  Testing custom fitness functions:")
