@@ -192,15 +192,15 @@ def funk_rhythm_fitness(rhythm: str) -> float:
 
 
 def ambient_rhythm_fitness(rhythm: str) -> float:
-    """Fitness for ambient rhythms: very sparse, meditative, breathing space.
+    """Fitness for ambient rhythms: flowing, meditative, but not silent.
 
     Characteristics:
-    - Very sparse (lots of space/rests)
-    - Simple, single hits (1s, not subdivisions)
-    - Consistent but with breathing room
-    - Long gaps between notes
+    - Moderate density (enough notes to create atmosphere)
+    - Simple, mostly single hits with occasional gentle subdivisions
+    - Consistent, flowing patterns
+    - Some space but not excessive silence
 
-    Example good patterns: "10001000", "10000000", "01000100", "10010000"
+    Example good patterns: "10101010", "11001100", "10110101", "11101110"
     """
     if not rhythm:
         return 0.0
@@ -210,41 +210,52 @@ def ambient_rhythm_fitness(rhythm: str) -> float:
     rest_beats = rhythm.count('0')
     total_beats = len(rhythm)
 
-    # Must have SOME notes (at least 1-2 per 8 beats)
+    # Must have notes - ambient should be atmospheric, not silent
     if note_beats == 0:
         return 0.0
 
-    # Target: 12-25% of beats have notes (very sparse)
-    # For 8 beats: 1-2 notes ideal
+    # Target: 40-70% of beats have notes (flowing, not sparse)
+    # This creates a continuous atmospheric texture
     note_ratio = note_beats / total_beats
-    if note_ratio < 0.1:
-        sparsity_score = 0.5  # Too sparse
-    elif 0.12 <= note_ratio <= 0.25:
-        sparsity_score = 1.0  # Perfect sparsity
-    elif note_ratio <= 0.35:
-        sparsity_score = 0.7  # Acceptable
+    if note_ratio < 0.3:
+        density_score = 0.4  # Too sparse - no atmosphere
+    elif 0.4 <= note_ratio <= 0.7:
+        density_score = 1.0  # Perfect flowing density
+    elif note_ratio <= 0.85:
+        density_score = 0.8  # Still good
     else:
-        sparsity_score = max(0, 1.0 - (note_ratio - 0.25) * 3)  # Penalize density
+        density_score = 0.6  # A bit too dense but ok
 
-    # Strongly prefer simple single hits (1s) over subdivisions
+    # Prefer simple single hits (1s) but allow some gentle subdivisions (2s)
     ones_count = rhythm.count('1')
-    subdivision_count = sum(1 for c in rhythm if c in '234')
-    simplicity_score = ones_count / max(note_beats, 1) if note_beats > 0 else 0
+    twos_count = rhythm.count('2')
+    heavy_subdivision = sum(1 for c in rhythm if c in '34')
 
-    # Penalize any subdivisions heavily for ambient
-    if subdivision_count > 0:
-        simplicity_score *= 0.5
+    # Ones and twos are good for ambient, 3s and 4s are too busy
+    simple_notes = ones_count + twos_count * 0.8
+    simplicity_score = simple_notes / max(note_beats, 1) if note_beats > 0 else 0
+
+    # Penalize heavy subdivisions (triplets, 16ths)
+    if heavy_subdivision > 0:
+        simplicity_score *= max(0.3, 1.0 - heavy_subdivision * 0.2)
 
     # Reward consistent patterns (ambient is meditative)
     consistency = rhythm_consistency(rhythm)
 
-    # Reward having substantial rest sections
-    rest_score = min(rest_beats / total_beats, 1.0) if total_beats > 0 else 0
+    # Some rests are good but not too many
+    rest_ratio = rest_beats / total_beats if total_beats > 0 else 0
+    # Ideal: 30-60% rests
+    if 0.3 <= rest_ratio <= 0.6:
+        rest_score = 1.0
+    elif rest_ratio < 0.3:
+        rest_score = 0.7  # Too dense
+    else:
+        rest_score = max(0.3, 1.0 - (rest_ratio - 0.6) * 2)  # Too sparse
 
     return (
-        0.40 * sparsity_score  # Very sparse is key
-        + 0.30 * simplicity_score  # Simple single hits
-        + 0.15 * rest_score  # Lots of rests
+        0.35 * density_score  # Flowing density
+        + 0.30 * simplicity_score  # Simple patterns
+        + 0.20 * rest_score  # Balanced rests
         + 0.15 * consistency  # Meditative repetition
     )
 

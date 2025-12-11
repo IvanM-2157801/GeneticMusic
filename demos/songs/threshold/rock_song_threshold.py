@@ -60,14 +60,14 @@ def main():
     
     # === SONG STRUCTURE ===
     composer.set_song_structure([
-        SectionType.INTRO, SectionType.INTRO, SectionType.INTRO, SectionType.INTRO,
-        SectionType.VERSE, SectionType.VERSE, SectionType.VERSE, SectionType.VERSE,
-        SectionType.CHORUS, SectionType.CHORUS, SectionType.CHORUS, SectionType.CHORUS,
-        SectionType.VERSE, SectionType.VERSE, SectionType.VERSE, SectionType.VERSE,
-        SectionType.CHORUS, SectionType.CHORUS, SectionType.CHORUS, SectionType.CHORUS,
-        SectionType.BRIDGE, SectionType.BRIDGE, SectionType.BRIDGE, SectionType.BRIDGE,
-        SectionType.CHORUS, SectionType.CHORUS, SectionType.CHORUS, SectionType.CHORUS,
-        SectionType.OUTRO, SectionType.OUTRO, SectionType.OUTRO, SectionType.OUTRO,
+        SectionType.INTRO,
+        SectionType.VERSE, SectionType.VERSE,
+        SectionType.CHORUS,
+        SectionType.VERSE,
+        SectionType.CHORUS,
+        SectionType.BRIDGE,
+        SectionType.CHORUS,
+        SectionType.OUTRO,
     ])
     
     # A minor scale
@@ -79,7 +79,7 @@ def main():
     composer.add_instrument(InstrumentConfig(
         name="power_chords",
         instrument="square",
-        beats_per_bar=8,
+        beats_per_bar=2,  # 2 chords per bar (half notes)
         octave_range=(2, 3),
         scale=a_minor,
         is_chord_layer=True,
@@ -87,7 +87,7 @@ def main():
         allowed_chord_types=["power", "major", "minor"],
         chord_fitness_fn=RockChordFitness(),
         octave_shift=2,
-        gain=0.2,
+        gain=0.3,
         lpf=2500,
         use_scale_degrees=True,
         play_in_sections=[SectionType.INTRO, SectionType.VERSE, SectionType.CHORUS, SectionType.BRIDGE, SectionType.OUTRO],

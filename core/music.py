@@ -22,6 +22,64 @@ class NoteName(Enum):
     REST = -1
 
 
+# Scale intervals in semitones from root
+SCALE_INTERVALS = {
+    "major": [0, 2, 4, 5, 7, 9, 11],
+    "minor": [0, 2, 3, 5, 7, 8, 10],
+    "dorian": [0, 2, 3, 5, 7, 9, 10],
+    "phrygian": [0, 1, 3, 5, 7, 8, 10],
+    "lydian": [0, 2, 4, 6, 7, 9, 11],
+    "mixolydian": [0, 2, 4, 5, 7, 9, 10],
+    "locrian": [0, 1, 3, 5, 6, 8, 10],
+    "blues": [0, 3, 5, 6, 7, 10],
+    "pentatonic": [0, 2, 4, 7, 9],
+    "minor_pentatonic": [0, 3, 5, 7, 10],
+}
+
+# Map note names to semitone values
+NOTE_NAME_TO_SEMITONE = {
+    "c": 0, "cs": 1, "db": 1, "d": 2, "ds": 3, "eb": 3,
+    "e": 4, "f": 5, "fs": 6, "gb": 6, "g": 7, "gs": 8,
+    "ab": 8, "a": 9, "as": 10, "bb": 10, "b": 11,
+}
+
+
+def parse_scale_string(scale_str: str) -> tuple[str, str, list[NoteName]]:
+    """Parse a scale string like 'd:minor' into root, mode, and NoteName list.
+
+    Args:
+        scale_str: Scale string in format "root:mode" (e.g., "d:minor", "c:major")
+
+    Returns:
+        Tuple of (root, mode, list of NoteName values in the scale)
+
+    Example:
+        >>> parse_scale_string("d:minor")
+        ('d', 'minor', [NoteName.D, NoteName.E, NoteName.F, NoteName.G, NoteName.A, NoteName.AS, NoteName.C])
+    """
+    parts = scale_str.lower().split(":")
+    root = parts[0] if parts else "c"
+    mode = parts[1] if len(parts) > 1 else "major"
+
+    # Get root semitone
+    root_semitone = NOTE_NAME_TO_SEMITONE.get(root, 0)
+
+    # Get scale intervals
+    intervals = SCALE_INTERVALS.get(mode, SCALE_INTERVALS["major"])
+
+    # Build list of NoteName values
+    note_names = []
+    for interval in intervals:
+        semitone = (root_semitone + interval) % 12
+        # Find the NoteName with this value
+        for note in NoteName:
+            if note.value == semitone and note != NoteName.REST:
+                note_names.append(note)
+                break
+
+    return root, mode, note_names
+
+
 @dataclass
 class Note:
     pitch: NoteName
@@ -162,27 +220,26 @@ class Layer:
         elif self.is_chord_layer and self.chord_progression:
             # Chord layer: output chords as comma-separated scale degrees
             pattern = self._chord_progression_to_strudel()
-            
-            # Build Strudel expression
-            result = f'n("{pattern}")'
-            
-            # Add octave shift if specified
+
+            # Build Strudel expression with .sub() applied to the pattern string
             if self.octave_shift != 0:
-                result += f'.sub({abs(self.octave_shift)})'
-            
+                result = f'n("{pattern}".sub({abs(self.octave_shift)}))'
+            else:
+                result = f'n("{pattern}")'
+
             # Add scale
             result += f'.scale("{self.scale}")'
-            
+
             # Add instrument
             result += f'.s("{self.instrument}")'
-            
+
             # Add gain
             result += f'.gain({self.gain})'
-            
+
             # Add low-pass filter
             if self.lpf:
                 result += f'.lpf({self.lpf})'
-            
+
             return result
 
         else:
@@ -195,12 +252,11 @@ class Layer:
                 # Fallback: simple grouping
                 pattern = " ".join(f"[{p.to_strudel()}]" for p in self.phrases)
 
-            # Build Strudel expression
-            result = f'n("{pattern}")'
-
-            # Add octave shift if specified
+            # Build Strudel expression with .sub() applied to the pattern string
             if self.octave_shift != 0:
-                result += f'.sub({abs(self.octave_shift)})'
+                result = f'n("{pattern}".sub({abs(self.octave_shift)}))'
+            else:
+                result = f'n("{pattern}")'
 
             # Add scale
             result += f'.scale("{self.scale}")'
@@ -219,43 +275,34 @@ class Layer:
 
     def _chord_progression_to_strudel(self) -> str:
         """Convert chord progression to Strudel notation.
-        
+
         Each chord becomes a group of comma-separated scale degrees.
-        Example: [Chord(0, [0,4,7]), Chord(4, [0,4,7])] -> "[0, 2, 4] [4, 6, 1]"
+        Uses simple stacked thirds from the root for clean diatonic harmony.
+        Example: Chord with root=0 and 3 notes -> "[0, 2, 4]" (I chord: 1-3-5)
+        Example: Chord with root=4 and 3 notes -> "[4, 6, 1]" (V chord: 5-7-2)
         """
         if not self.chord_progression:
             return "0"
-        
+
         chord_strs = []
         for chord in self.chord_progression:
-            # Convert chord to scale degrees
-            # Each interval maps to a scale degree offset from the root
+            # Simple approach: stack thirds from the root
+            # This ensures proper diatonic harmony (no dissonant 0-1 intervals)
+            root = chord.root_degree
+            num_notes = len(chord.intervals)
+
+            # Build chord by stacking scale degrees (thirds)
+            # root, root+2 (3rd), root+4 (5th), root+6 (7th)
             degrees = []
-            for interval in chord.intervals:
-                # Approximate: semitone intervals to scale degrees
-                # 0=root, 3-4=3rd, 7=5th, 10-11=7th, 14=9th
-                if interval == 0:
-                    degree = chord.root_degree
-                elif interval in (3, 4):
-                    degree = (chord.root_degree + 2) % 7  # 3rd
-                elif interval in (5,):
-                    degree = (chord.root_degree + 3) % 7  # 4th
-                elif interval in (7, 8):
-                    degree = (chord.root_degree + 4) % 7  # 5th
-                elif interval in (10, 11):
-                    degree = (chord.root_degree + 6) % 7  # 7th
-                elif interval >= 12:
-                    degree = (chord.root_degree + (interval - 12) // 2) % 7
-                else:
-                    # For sus2, etc.
-                    degree = (chord.root_degree + interval // 2) % 7
+            for i in range(num_notes):
+                degree = (root + i * 2) % 7
                 degrees.append(str(degree))
-            
+
             if len(degrees) == 1:
                 chord_strs.append(degrees[0])
             else:
                 chord_strs.append("[" + ", ".join(degrees) + "]")
-        
+
         return " ".join(chord_strs)
 
 

@@ -4,8 +4,26 @@ This module provides fitness functions for evaluating dynamic (gain) and
 filter (LPF) envelopes, ensuring musically appropriate automation curves.
 """
 
+from typing import TYPE_CHECKING
+from enum import Enum
 from core.music import DynamicEnvelope, FilterEnvelope
-from song_composer import SectionType, SECTION_DYNAMICS
+
+if TYPE_CHECKING:
+    from song_composer import SectionType
+
+# Local copy of section dynamics to avoid circular import
+# These match the values in song_composer.SECTION_DYNAMICS
+SECTION_DYNAMICS_LOCAL = {
+    "intro": {"gain": (0.3, 0.5), "lpf": (2000, 4000)},
+    "verse": {"gain": (0.5, 0.7), "lpf": (3000, 6000)},
+    "prechorus": {"gain": (0.6, 0.8), "lpf": (5000, 8000)},
+    "chorus": {"gain": (0.8, 1.0), "lpf": (6000, 10000)},
+    "bridge": {"gain": (0.4, 0.6), "lpf": (2000, 5000)},
+    "breakdown": {"gain": (0.3, 0.5), "lpf": (2000, 4000)},
+    "buildup": {"gain": (0.4, 0.8), "lpf": (2000, 8000)},
+    "drop": {"gain": (0.9, 1.0), "lpf": (8000, 12000)},
+    "outro": {"gain": (0.5, 0.2), "lpf": (4000, 1000)},
+}
 
 
 class DynamicEnvelopeFitness:
@@ -19,7 +37,7 @@ class DynamicEnvelopeFitness:
 
     def __init__(
         self,
-        section_type: SectionType,
+        section_type: "SectionType",
         smoothness_weight: float = 0.3,
         appropriateness_weight: float = 0.5,
         interest_weight: float = 0.2,
@@ -38,7 +56,9 @@ class DynamicEnvelopeFitness:
         self.interest_weight = interest_weight
 
         # Get expected gain range for this section type
-        defaults = SECTION_DYNAMICS.get(section_type, {"gain": (0.5, 0.7)})
+        # Use .value to get string key for the local dict
+        section_key = section_type.value if hasattr(section_type, 'value') else str(section_type)
+        defaults = SECTION_DYNAMICS_LOCAL.get(section_key, {"gain": (0.5, 0.7)})
         self.expected_min, self.expected_max = defaults["gain"]
 
     def evaluate(self, envelope: DynamicEnvelope) -> float:
@@ -153,7 +173,7 @@ class FilterEnvelopeFitness:
 
     def __init__(
         self,
-        section_type: SectionType,
+        section_type: "SectionType",
         smoothness_weight: float = 0.3,
         appropriateness_weight: float = 0.5,
         sweep_quality_weight: float = 0.2,
@@ -172,7 +192,8 @@ class FilterEnvelopeFitness:
         self.sweep_quality_weight = sweep_quality_weight
 
         # Get expected filter range for this section type
-        defaults = SECTION_DYNAMICS.get(section_type, {"lpf": (3000, 6000)})
+        section_key = section_type.value if hasattr(section_type, 'value') else str(section_type)
+        defaults = SECTION_DYNAMICS_LOCAL.get(section_key, {"lpf": (3000, 6000)})
         self.expected_min, self.expected_max = defaults["lpf"]
 
     def evaluate(self, envelope: FilterEnvelope) -> float:
@@ -275,8 +296,11 @@ class FilterEnvelopeFitness:
 
         sweep_direction = end_freq - start_freq  # Positive = opening, negative = closing
 
+        # Get section name for comparison
+        section_name = self.section_type.value if hasattr(self.section_type, 'value') else str(self.section_type)
+
         # Section-specific preferences
-        if self.section_type in {SectionType.BUILDUP, SectionType.PRECHORUS}:
+        if section_name in {"buildup", "prechorus"}:
             # Should be ascending (opening)
             if sweep_direction > 1000:
                 return 1.0
@@ -285,7 +309,7 @@ class FilterEnvelopeFitness:
             else:
                 return 0.3
 
-        elif self.section_type in {SectionType.BREAKDOWN, SectionType.OUTRO}:
+        elif section_name in {"breakdown", "outro"}:
             # Should be descending (closing)
             if sweep_direction < -1000:
                 return 1.0
@@ -294,7 +318,7 @@ class FilterEnvelopeFitness:
             else:
                 return 0.4
 
-        elif self.section_type in {SectionType.CHORUS, SectionType.DROP}:
+        elif section_name in {"chorus", "drop"}:
             # Should be high and open (stable or slightly ascending)
             if end_freq > 6000:
                 return 1.0
@@ -303,7 +327,7 @@ class FilterEnvelopeFitness:
             else:
                 return 0.4
 
-        elif self.section_type == SectionType.INTRO:
+        elif section_name == "intro":
             # Can be either direction, prefer ascending
             if sweep_direction > 500:
                 return 0.9
@@ -323,7 +347,7 @@ class FilterEnvelopeFitness:
 def evaluate_section_dynamics(
     dynamic_envelope: DynamicEnvelope,
     filter_envelope: FilterEnvelope,
-    section_type: SectionType,
+    section_type: "SectionType",
 ) -> float:
     """Evaluate both dynamic and filter envelopes for a section.
 

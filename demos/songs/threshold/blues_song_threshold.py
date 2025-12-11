@@ -58,21 +58,16 @@ def main():
         energy_level=0.5,
     ))
     
-    # === SONG STRUCTURE (12-bar blues) ===
+    # === SONG STRUCTURE (simplified 12-bar blues) ===
     composer.set_song_structure([
-        SectionType.INTRO, SectionType.INTRO,
-        # 12-bar verse 1
-        SectionType.VERSE, SectionType.VERSE, SectionType.VERSE, SectionType.VERSE, SectionType.VERSE, SectionType.VERSE,
-        SectionType.CHORUS, SectionType.CHORUS,
-        # 12-bar verse 2
-        SectionType.VERSE, SectionType.VERSE, SectionType.VERSE, SectionType.VERSE, SectionType.VERSE, SectionType.VERSE,
-        SectionType.CHORUS, SectionType.CHORUS,
-        # Solo
-        SectionType.BRIDGE, SectionType.BRIDGE, SectionType.BRIDGE, SectionType.BRIDGE, SectionType.BRIDGE, SectionType.BRIDGE,
-        # Final verse
-        SectionType.VERSE, SectionType.VERSE, SectionType.VERSE, SectionType.VERSE, SectionType.VERSE, SectionType.VERSE,
-        SectionType.CHORUS, SectionType.CHORUS,
-        SectionType.OUTRO, SectionType.OUTRO,
+        SectionType.INTRO,
+        SectionType.VERSE, SectionType.VERSE,
+        SectionType.CHORUS,
+        SectionType.VERSE, SectionType.VERSE,
+        SectionType.CHORUS,
+        SectionType.BRIDGE, SectionType.BRIDGE,
+        SectionType.CHORUS,
+        SectionType.OUTRO,
     ])
     
     # Blues scale
@@ -101,7 +96,7 @@ def main():
     composer.add_instrument(InstrumentConfig(
         name="chords",
         instrument="triangle",
-        beats_per_bar=8,
+        beats_per_bar=2,  # 2 chords per bar (half notes)
         octave_range=(3, 4),
         scale=blues_scale,
         is_chord_layer=True,
@@ -109,7 +104,7 @@ def main():
         allowed_chord_types=["dom7", "major", "minor"],
         chord_fitness_fn=BluesChordFitness(),
         octave_shift=3,
-        gain=0.15,
+        gain=0.25,
         lpf=2000,
         use_scale_degrees=True,
         play_in_sections=[SectionType.INTRO, SectionType.VERSE, SectionType.CHORUS, SectionType.BRIDGE, SectionType.OUTRO],

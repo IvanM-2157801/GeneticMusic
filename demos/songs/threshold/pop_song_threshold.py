@@ -60,14 +60,14 @@ def main():
     
     # === SONG STRUCTURE ===
     composer.set_song_structure([
-        SectionType.INTRO, SectionType.INTRO, SectionType.INTRO, SectionType.INTRO,
-        SectionType.VERSE, SectionType.VERSE, SectionType.VERSE, SectionType.VERSE,
-        SectionType.CHORUS, SectionType.CHORUS, SectionType.CHORUS, SectionType.CHORUS,
-        SectionType.VERSE, SectionType.VERSE, SectionType.VERSE, SectionType.VERSE,
-        SectionType.CHORUS, SectionType.CHORUS, SectionType.CHORUS, SectionType.CHORUS,
-        SectionType.BRIDGE, SectionType.BRIDGE, SectionType.BRIDGE, SectionType.BRIDGE,
-        SectionType.CHORUS, SectionType.CHORUS, SectionType.CHORUS, SectionType.CHORUS,
-        SectionType.OUTRO, SectionType.OUTRO, SectionType.OUTRO, SectionType.OUTRO,
+        SectionType.INTRO,
+        SectionType.VERSE, SectionType.VERSE,
+        SectionType.CHORUS,
+        SectionType.VERSE,
+        SectionType.CHORUS,
+        SectionType.BRIDGE,
+        SectionType.CHORUS,
+        SectionType.OUTRO,
     ])
     
     c_major = [NoteName.C, NoteName.D, NoteName.E, NoteName.F, NoteName.G, NoteName.A, NoteName.B]
@@ -79,27 +79,27 @@ def main():
         name="melody",
         instrument="piano",
         beats_per_bar=4,
-        max_subdivision=2,
+        max_subdivision=1,  # Simple quarter notes
         octave_range=(4, 6),
         scale=c_major,
-        rhythm_fitness_fn=RHYTHM_FITNESS_FUNCTIONS["funk"],
+        rhythm_fitness_fn=RHYTHM_FITNESS_FUNCTIONS["pop"],
         melody_fitness_fn=MelodicFitness(),
-        octave_shift=7,
-        gain=0.3,
+        octave_shift=5,
+        gain=0.35,
         lpf=8000,
         use_scale_degrees=True,
         play_in_sections=[SectionType.VERSE, SectionType.CHORUS, SectionType.BRIDGE],
     ))
-    
+
     # Piano pad
     composer.add_instrument(InstrumentConfig(
         name="piano_pad",
         instrument="piano",
-        beats_per_bar=8,
-        max_subdivision=2,
+        beats_per_bar=4,  # Quarter notes for flowing pad
+        max_subdivision=1,  # Simple quarter notes
         octave_range=(4, 6),
         scale=c_major,
-        rhythm_fitness_fn=RHYTHM_FITNESS_FUNCTIONS["funk"],
+        rhythm_fitness_fn=RHYTHM_FITNESS_FUNCTIONS["pop"],
         melody_fitness_fn=MelodicFitness(),
         octave_shift=3,
         gain=0.3,
@@ -112,7 +112,7 @@ def main():
     composer.add_instrument(InstrumentConfig(
         name="chords",
         instrument="triangle",
-        beats_per_bar=8,
+        beats_per_bar=2,  # 2 chords per bar (half notes)
         octave_range=(3, 4),
         scale=c_major,
         is_chord_layer=True,
@@ -120,7 +120,7 @@ def main():
         allowed_chord_types=["major", "minor", "sus2", "sus4"],
         chord_fitness_fn=PopChordFitness(),
         octave_shift=3,
-        gain=0.15,
+        gain=0.25,
         lpf=2500,
         use_scale_degrees=True,
         play_in_sections=[SectionType.INTRO, SectionType.VERSE, SectionType.CHORUS, SectionType.BRIDGE, SectionType.OUTRO],
@@ -131,33 +131,33 @@ def main():
         name="kick",
         instrument="bd",
         beats_per_bar=4,
-        max_subdivision=2,
+        max_subdivision=1,  # Simple kick pattern
         is_drum=True,
         drum_sound="bd",
         rhythm_fitness_fn=DRUM_FITNESS_FUNCTIONS["kick"],
         gain=0.8,
         play_in_sections=[SectionType.VERSE, SectionType.CHORUS, SectionType.BRIDGE],
     ))
-    
+
     # Hi-hat
     composer.add_instrument(InstrumentConfig(
         name="hihat",
         instrument="hh",
         beats_per_bar=4,
-        max_subdivision=2,
+        max_subdivision=1,  # Simple hi-hat pattern
         is_drum=True,
         drum_sound="hh",
         rhythm_fitness_fn=DRUM_FITNESS_FUNCTIONS["hihat"],
         gain=0.5,
         play_in_sections=[SectionType.CHORUS, SectionType.BRIDGE],
     ))
-    
+
     # Snare
     composer.add_instrument(InstrumentConfig(
         name="snare",
         instrument="sd",
         beats_per_bar=4,
-        max_subdivision=2,
+        max_subdivision=1,  # Simple snare pattern
         is_drum=True,
         drum_sound="sd",
         rhythm_fitness_fn=DRUM_FITNESS_FUNCTIONS["snare"],

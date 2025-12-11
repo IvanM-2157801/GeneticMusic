@@ -64,14 +64,14 @@ def main():
 
     # === SONG STRUCTURE ===
     composer.set_song_structure([
-        SectionType.INTRO, SectionType.INTRO, SectionType.INTRO, SectionType.INTRO,
-        SectionType.VERSE, SectionType.VERSE, SectionType.VERSE, SectionType.VERSE,
-        SectionType.CHORUS, SectionType.CHORUS, SectionType.CHORUS, SectionType.CHORUS,
-        SectionType.VERSE, SectionType.VERSE, SectionType.VERSE, SectionType.VERSE,
-        SectionType.CHORUS, SectionType.CHORUS, SectionType.CHORUS, SectionType.CHORUS,
-        SectionType.BRIDGE, SectionType.BRIDGE, SectionType.BRIDGE, SectionType.BRIDGE,
-        SectionType.CHORUS, SectionType.CHORUS, SectionType.CHORUS, SectionType.CHORUS,
-        SectionType.OUTRO, SectionType.OUTRO, SectionType.OUTRO, SectionType.OUTRO,
+        SectionType.INTRO,
+        SectionType.VERSE, SectionType.VERSE,
+        SectionType.CHORUS,
+        SectionType.VERSE,
+        SectionType.CHORUS,
+        SectionType.BRIDGE,
+        SectionType.CHORUS,
+        SectionType.OUTRO,
     ])
 
     c_major = [NoteName.C, NoteName.D, NoteName.E, NoteName.F, NoteName.G, NoteName.A, NoteName.B]
@@ -99,11 +99,11 @@ def main():
     composer.add_instrument(InstrumentConfig(
         name="piano_pad",
         instrument="sawtooth",
-        beats_per_bar=8,
+        beats_per_bar=4,  # Quarter notes for flowing pad
         max_subdivision=2,
         octave_range=(3, 5),
         scale=c_major,
-        rhythm_fitness_fn=RHYTHM_FITNESS_FUNCTIONS["funk"],
+        rhythm_fitness_fn=RHYTHM_FITNESS_FUNCTIONS["pop"],  # Use pop for consistent patterns
         melody_fitness_fn=MelodicFitness(),
         octave_shift=3,
         gain=0.3,
@@ -116,7 +116,7 @@ def main():
     composer.add_instrument(InstrumentConfig(
         name="chords",
         instrument="triangle",
-        beats_per_bar=8,
+        beats_per_bar=2,  # 2 chords per bar (half notes)
         octave_range=(3, 4),
         scale=c_major,
         is_chord_layer=True,
@@ -124,7 +124,7 @@ def main():
         allowed_chord_types=["major", "minor", "sus2", "sus4"],
         chord_fitness_fn=PopChordFitness(),
         octave_shift=3,
-        gain=0.15,
+        gain=0.25,
         lpf=2500,
         use_scale_degrees=True,
         play_in_sections=[SectionType.INTRO, SectionType.VERSE, SectionType.CHORUS, SectionType.BRIDGE, SectionType.OUTRO],

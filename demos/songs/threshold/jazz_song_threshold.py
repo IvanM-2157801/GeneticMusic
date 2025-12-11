@@ -60,18 +60,16 @@ def main():
     
     # === SONG STRUCTURE (AABA with solos) ===
     composer.set_song_structure([
-        SectionType.INTRO, SectionType.INTRO,
+        SectionType.INTRO,
         # Head - AABA
-        SectionType.VERSE, SectionType.VERSE, SectionType.VERSE, SectionType.VERSE,
-        SectionType.VERSE, SectionType.VERSE, SectionType.VERSE, SectionType.VERSE,
-        SectionType.BRIDGE, SectionType.BRIDGE, SectionType.BRIDGE, SectionType.BRIDGE,
-        SectionType.VERSE, SectionType.VERSE, SectionType.VERSE, SectionType.VERSE,
-        # Solo choruses
-        SectionType.CHORUS, SectionType.CHORUS, SectionType.CHORUS, SectionType.CHORUS,
-        SectionType.CHORUS, SectionType.CHORUS, SectionType.CHORUS, SectionType.CHORUS,
+        SectionType.VERSE, SectionType.VERSE,
+        SectionType.BRIDGE,
+        SectionType.VERSE,
+        # Solo
+        SectionType.CHORUS, SectionType.CHORUS,
         # Head out
-        SectionType.VERSE, SectionType.VERSE, SectionType.VERSE, SectionType.VERSE,
-        SectionType.OUTRO, SectionType.OUTRO,
+        SectionType.VERSE,
+        SectionType.OUTRO,
     ])
     
     # Dorian mode for jazz
@@ -100,7 +98,7 @@ def main():
     composer.add_instrument(InstrumentConfig(
         name="chords",
         instrument="triangle",
-        beats_per_bar=8,
+        beats_per_bar=2,  # 2 chords per bar (half notes)
         octave_range=(3, 4),
         scale=c_dorian,
         is_chord_layer=True,
@@ -108,7 +106,7 @@ def main():
         allowed_chord_types=["maj7", "min7", "dom7"],
         chord_fitness_fn=JazzChordFitness(),
         octave_shift=3,
-        gain=0.15,
+        gain=0.25,
         lpf=3000,
         use_scale_degrees=True,
         play_in_sections=[SectionType.VERSE, SectionType.BRIDGE, SectionType.CHORUS],

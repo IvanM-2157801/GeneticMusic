@@ -39,8 +39,8 @@ def main():
     composer = SongComposer(
         population_size=80,
         mutation_rate=0.2,
-        fitness_threshold=0.90,  # Stop when fitness >= 0.75
-        max_generations=100,
+        fitness_threshold=0.80,  # Stop when fitness >= 0.80
+        max_generations=150,
         rhythm_generations=25,
         melody_generations=30,
         chord_generations=25,
@@ -258,14 +258,14 @@ def main():
         InstrumentConfig(
             name="pad",
             instrument="sine",
-            beats_per_bar=2,
+            beats_per_bar=4,  # Quarter notes for flowing pad
             max_subdivision=1,
             octave_range=(3, 5),
             scale=d_minor,
-            rhythm_fitness_fn=RHYTHM_FITNESS_FUNCTIONS["ambient"],
+            rhythm_fitness_fn=RHYTHM_FITNESS_FUNCTIONS["pop"],  # Use pop for consistent patterns
             melody_fitness_fn=StableFitness(),
             octave_shift=4,
-            gain=0.2,
+            gain=0.25,
             lpf=2000,
             use_scale_degrees=True,
             play_in_sections=[
@@ -290,14 +290,14 @@ def main():
         InstrumentConfig(
             name="melody",
             instrument="triangle",
-            beats_per_bar=2,
-            max_subdivision=1,
+            beats_per_bar=4,  # Quarter notes for flowing melody
+            max_subdivision=2,
             octave_range=(4, 6),
             scale=d_minor,
-            rhythm_fitness_fn=RHYTHM_FITNESS_FUNCTIONS["ambient"],
+            rhythm_fitness_fn=RHYTHM_FITNESS_FUNCTIONS["jazz"],  # Jazz for expressive rhythm
             melody_fitness_fn=MelodicFitness(),  # More expressive for lead
             octave_shift=5,
-            gain=0.3,
+            gain=0.35,
             lpf=4000,
             use_scale_degrees=True,
             play_in_sections=[SectionType.VERSE, SectionType.CHORUS],

@@ -95,7 +95,7 @@ def main():
     composer.add_instrument(InstrumentConfig(
         name="chords",
         instrument="triangle",
-        beats_per_bar=8,
+        beats_per_bar=2,  # 2 chords per bar (half notes)
         octave_range=(3, 4),
         scale=c_major,
         is_chord_layer=True,
@@ -103,7 +103,7 @@ def main():
         allowed_chord_types=["major", "minor", "sus4"],
         chord_fitness_fn=PopChordFitness(),
         octave_shift=3,
-        gain=0.15,
+        gain=0.25,
         lpf=2500,
         use_scale_degrees=True,
         play_in_sections=[SectionType.VERSE, SectionType.CHORUS],

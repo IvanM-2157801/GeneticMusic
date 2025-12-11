@@ -15,11 +15,25 @@ class ChordFitnessFunction(ABC):
 # === Common Chord Fitness Utilities ===
 
 def chord_variety(progression: ChordProgression) -> float:
-    """Measure chord variety (0-1). Higher = more variety in roots."""
+    """Measure chord variety (0-1). Higher = more variety in roots.
+
+    Strongly penalizes repetitive chords (same root repeated).
+    """
     if not progression.chords:
         return 0.0
-    roots = {c.root_degree for c in progression.chords}
-    return min(len(roots) / 4.0, 1.0)  # Normalize to 4 different roots being ideal
+
+    roots = [c.root_degree for c in progression.chords]
+    unique_roots = set(roots)
+
+    # Count consecutive repetitions (bad)
+    repetitions = sum(1 for i in range(len(roots) - 1) if roots[i] == roots[i + 1])
+    repetition_penalty = repetitions / max(len(roots) - 1, 1)
+
+    # Variety score: unique roots out of total
+    variety_score = min(len(unique_roots) / min(len(roots), 4), 1.0)
+
+    # Combine: variety is good, repetition is bad
+    return 0.6 * variety_score + 0.4 * (1.0 - repetition_penalty)
 
 
 def chord_type_variety(progression: ChordProgression) -> float:
@@ -275,16 +289,21 @@ class MetalChordFitness(ChordFitnessFunction):
 
 class AmbientChordFitness(ChordFitnessFunction):
     """Fitness for ambient: suspended chords, slow changes, open voicings."""
-    
+
     def evaluate(self, progression: ChordProgression) -> float:
         if not progression.chords:
             return 0.0
-        
+
+        # Minimum variety requirement - at least 2 different chords
+        if chord_variety(progression) < 0.3:
+            return 0.3  # Cap fitness if too repetitive
+
         score = (
-            0.35 * self._suspended_chord_bonus(progression) +
+            0.30 * self._suspended_chord_bonus(progression) +
             0.25 * self._open_voicing_bonus(progression) +
-            0.20 * root_motion_smoothness(progression) +
-            0.20 * self._static_bonus(progression)
+            0.25 * root_motion_smoothness(progression) +
+            0.10 * self._static_bonus(progression) +
+            0.10 * chord_variety(progression)
         )
         return score
     
