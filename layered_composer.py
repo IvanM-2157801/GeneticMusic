@@ -10,7 +10,16 @@ Features:
 from dataclasses import dataclass, field
 from typing import Callable, Optional
 from core.genetic import GeneticAlgorithm, Individual
-from core.music import Phrase, NoteName, Layer, Composition, HarmonicContext
+from core.music import (
+    Phrase,
+    NoteName,
+    Layer,
+    Composition,
+    HarmonicContext,
+    LayerGroup,
+    Arrangement,
+    SongStructure,
+)
 from core.genome_ops import (
     random_rhythm,
     mutate_rhythm,
@@ -652,6 +661,154 @@ class LayeredComposer:
                     layers.append(layer)
 
         return Composition(layers=layers, bpm=bpm)
+
+    def get_song_structure(
+        self,
+        bpm: int = 120,
+        random_scale: bool = True,
+        groups: dict[str, list[str]] = None,
+        arrangement: list[tuple[int, str]] = None,
+    ) -> SongStructure:
+        """Get the final composition as a SongStructure with named constants.
+
+        Args:
+            bpm: Beats per minute
+            random_scale: If True, uses a random scale for all layers
+            groups: Dict mapping group_name -> [layer_names] to create LayerGroups
+                    Example: {"drums": ["kick", "hihat", "snare"]}
+            arrangement: List of (bars, group_or_layer_name) for the song structure
+                    Example: [(4, "drums"), (4, "melody_group"), (4, "drums")]
+
+        Returns:
+            SongStructure with named layer constants, groups, and arrangement
+        """
+        # Generate random scale if needed
+        if random_scale:
+            composition_scale = Composition.random_scale()
+        else:
+            composition_scale = "c:major"
+
+        song = SongStructure(bpm=bpm)
+
+        # Build layers dict (name -> Layer)
+        layers_by_name: dict[str, Layer] = {}
+        for config in self.layer_configs:
+            rhythm = self.evolved_rhythms.get(config.name)
+            layer_scale = config.strudel_scale if config.strudel_scale else composition_scale
+
+            if config.is_drum:
+                if rhythm:
+                    layer = Layer(
+                        name=config.name,
+                        phrases=[],
+                        instrument=config.instrument,
+                        rhythm=rhythm,
+                        gain=config.gain,
+                        lpf=config.lpf,
+                        hpf=config.hpf,
+                        postgain=config.postgain,
+                        room=config.room,
+                        roomsize=config.roomsize,
+                        delay=config.delay,
+                        delaytime=config.delaytime,
+                        delayfeedback=config.delayfeedback,
+                        distort=config.distort,
+                        pan=config.pan,
+                        is_drum=True,
+                        drum_sound=config.drum_sound,
+                        layer_role=config.layer_role,
+                        context_group=config.context_group,
+                        bank=config.bank,
+                    )
+                    layers_by_name[config.name] = layer
+
+            elif config.is_chord_layer:
+                chord_progression = self.evolved_chords.get(config.name)
+                if chord_progression:
+                    layer = Layer(
+                        name=config.name,
+                        phrases=[],
+                        instrument=config.instrument,
+                        rhythm="",
+                        scale=layer_scale,
+                        octave_shift=config.octave_shift,
+                        gain=config.gain,
+                        lpf=config.lpf,
+                        hpf=config.hpf,
+                        postgain=config.postgain,
+                        room=config.room,
+                        roomsize=config.roomsize,
+                        delay=config.delay,
+                        delaytime=config.delaytime,
+                        delayfeedback=config.delayfeedback,
+                        distort=config.distort,
+                        pan=config.pan,
+                        attack=config.attack,
+                        decay=config.decay,
+                        sustain=config.sustain,
+                        release=config.release,
+                        is_chord_layer=True,
+                        chord_progression=chord_progression.chords,
+                        layer_role=config.layer_role,
+                        context_group=config.context_group,
+                        bank=config.bank,
+                    )
+                    layers_by_name[config.name] = layer
+
+            else:
+                phrase = self.evolved_phrases.get(config.name)
+                if phrase:
+                    layer = Layer(
+                        name=config.name,
+                        phrases=[phrase],
+                        instrument=config.instrument,
+                        rhythm=rhythm if rhythm else "",
+                        scale=layer_scale,
+                        octave_shift=config.octave_shift,
+                        gain=config.gain,
+                        lpf=config.lpf,
+                        hpf=config.hpf,
+                        postgain=config.postgain,
+                        room=config.room,
+                        roomsize=config.roomsize,
+                        delay=config.delay,
+                        delaytime=config.delaytime,
+                        delayfeedback=config.delayfeedback,
+                        distort=config.distort,
+                        pan=config.pan,
+                        attack=config.attack,
+                        decay=config.decay,
+                        sustain=config.sustain,
+                        release=config.release,
+                        use_scale_degrees=config.use_scale_degrees,
+                        chord_mode=config.chord_mode,
+                        base_octave=config.base_octave,
+                        layer_role=config.layer_role,
+                        context_group=config.context_group,
+                        bank=config.bank,
+                    )
+                    layers_by_name[config.name] = layer
+
+        # Add all layers to song structure
+        for layer in layers_by_name.values():
+            song.add_layer(layer)
+
+        # Create layer groups if specified
+        if groups:
+            for group_name, layer_names in groups.items():
+                group_layers = [layers_by_name[name] for name in layer_names if name in layers_by_name]
+                if group_layers:
+                    group = LayerGroup(name=group_name, layers=group_layers)
+                    song.add_group(group)
+
+        # Create arrangement if specified
+        if arrangement:
+            arr = Arrangement(name="main")
+            for bars, content_name in arrangement:
+                arr.add_section(bars, content_name)
+            song.add_arrangement(arr)
+
+        return song
 
     def _log_fitness_breakdown(self, layer_name: str, details: dict) -> None:
         """Log detailed fitness breakdown for a layer."""

@@ -654,6 +654,224 @@ class FilterEnvelope:
 
 
 @dataclass
+class LayerGroup:
+    """A group of layers that play together using stack().
+
+    LayerGroups can have their own effects chain applied to all layers.
+    In Strudel, this outputs as: stack(layer1, layer2, ...).effect1().effect2()
+
+    Example output (use_references=True):
+        const verse_drums = stack(kick, hihat, snare).bank("RolandTR808").gain(0.4)
+
+    Example output (use_references=False):
+        const verse_drums = stack(
+            sound("bd ~ ~ ~ bd ~ ~ ~").gain(0.8),
+            sound("[hh hh] [hh hh] ...").gain(0.5),
+            sound("~ ~ sd ~ ~ ~ sd ~").gain(0.7)
+        ).bank("RolandTR808").gain(0.4)
+    """
+
+    name: str
+    layers: list[Layer] = field(default_factory=list)
+    # Group-level effects (applied to the whole stack)
+    gain: float = 0.0  # 0 = don't add
+    lpf: int = 0
+    hpf: int = 0
+    room: float = 0.0
+    bank: str = ""
+
+    def to_strudel(self, use_references: bool = True) -> str:
+        """Convert layer group to Strudel stack() notation.
+
+        Args:
+            use_references: If True, outputs layer names as references (e.g., stack(kick, snare)).
+                           If False, outputs full layer definitions inline.
+        """
+        if not self.layers:
+            return 'sound("~")'
+
+        if use_references:
+            # Use layer names as references
+            layer_strs = [layer.name for layer in self.layers]
+        else:
+            # Output full layer definitions
+            layer_strs = [layer.to_strudel() for layer in self.layers]
+
+        # Wrap in stack()
+        if len(layer_strs) == 1:
+            result = layer_strs[0] if use_references else layer_strs[0]
+        else:
+            if use_references:
+                result = "stack(" + ", ".join(layer_strs) + ")"
+            else:
+                result = "stack(\n  " + ",\n  ".join(layer_strs) + "\n)"
+
+        # Add group-level effects
+        if self.gain > 0:
+            result += f".gain({self.gain})"
+        if self.lpf > 0:
+            result += f".lpf({self.lpf})"
+        if self.hpf > 0:
+            result += f".hpf({self.hpf})"
+        if self.room > 0:
+            result += f".room({self.room})"
+        if self.bank:
+            result += f'.bank("{self.bank}")'
+
+        return result
+
+    def to_strudel_const(self, use_references: bool = True) -> str:
+        """Output as a JavaScript const declaration."""
+        return f"const {self.name} = {self.to_strudel(use_references)}"
+
+
+@dataclass
+class ArrangementSection:
+    """A section in an arrangement with a duration and content.
+
+    Content can be a Layer, LayerGroup, or another Arrangement.
+    Duration is in bars.
+    """
+
+    bars: int
+    content: "Layer | LayerGroup | str"  # str for referencing named constants
+
+    def to_strudel(self) -> str:
+        """Convert to [bars, content] format for arrange()."""
+        if isinstance(self.content, str):
+            # Reference to a named constant
+            return f"[{self.bars}, {self.content}]"
+        elif isinstance(self.content, (Layer, LayerGroup)):
+            return f"[{self.bars}, {self.content.to_strudel()}]"
+        else:
+            return f'[{self.bars}, sound("~")]'
+
+
+@dataclass
+class Arrangement:
+    """An arrangement of sections using Strudel's arrange() function.
+
+    Example output:
+        arrange(
+            [1, intro],
+            [4, verse_drums],
+            [4, chorus_drums],
+            [1, outro]
+        )
+    """
+
+    name: str
+    sections: list[ArrangementSection] = field(default_factory=list)
+    # Arrangement-level effects
+    gain: float = 0.0
+    bank: str = ""
+
+    def add_section(self, bars: int, content: "Layer | LayerGroup | str") -> None:
+        """Add a section to the arrangement."""
+        self.sections.append(ArrangementSection(bars=bars, content=content))
+
+    def to_strudel(self) -> str:
+        """Convert to Strudel arrange() notation."""
+        if not self.sections:
+            return 'sound("~")'
+
+        section_strs = [s.to_strudel() for s in self.sections]
+        result = "arrange(\n  " + ",\n  ".join(section_strs) + "\n)"
+
+        # Add arrangement-level effects
+        if self.gain > 0:
+            result += f".gain({self.gain})"
+        if self.bank:
+            result += f'.bank("{self.bank}")'
+
+        return result
+
+    def to_strudel_const(self) -> str:
+        """Output as a JavaScript const declaration."""
+        return f"const {self.name} = {self.to_strudel()}"
+
+
+@dataclass
+class SongStructure:
+    """Complete song structure with named layers, groups, and arrangements.
+
+    This is the top-level container that outputs a full Strudel composition
+    with named constants for reusable sections.
+
+    Example output:
+        setcpm(30)
+
+        // Layers
+        const kick = sound("bd ~ ~ ~ bd ~ ~ ~").gain(0.8).bank("RolandTR808")
+        const hihat = sound("[hh hh] [hh hh] ...").gain(0.5).bank("RolandTR808")
+        const snare = sound("~ ~ sd ~ ~ ~ sd ~").gain(0.7).bank("RolandTR808")
+
+        // Layer Groups
+        const verse_drums = stack(kick, hihat, snare).gain(0.4)
+        const chorus_drums = stack(kick, hihat, snare).gain(0.6)
+
+        // Arrangements
+        $: arrange(
+            [4, verse_drums],
+            [4, chorus_drums],
+            [4, verse_drums],
+            [4, chorus_drums]
+        )
+    """
+
+    bpm: int = 120
+    layers: dict[str, Layer] = field(default_factory=dict)
+    groups: dict[str, LayerGroup] = field(default_factory=dict)
+    arrangements: list[Arrangement] = field(default_factory=list)
+
+    def add_layer(self, layer: Layer) -> None:
+        """Add a named layer."""
+        self.layers[layer.name] = layer
+
+    def add_group(self, group: LayerGroup) -> None:
+        """Add a named layer group."""
+        self.groups[group.name] = group
+
+    def add_arrangement(self, arrangement: Arrangement) -> None:
+        """Add an arrangement track."""
+        self.arrangements.append(arrangement)
+
+    def to_strudel(self) -> str:
+        """Generate complete Strudel code with named constants."""
+        lines = [f"setcpm({self.bpm / 4})", ""]
+
+        # Output layer constants
+        if self.layers:
+            lines.append("// Layers")
+            for name, layer in self.layers.items():
+                lines.append(f"const {name} = {layer.to_strudel()}")
+            lines.append("")
+
+        # Output group constants (using references to layer names)
+        if self.groups:
+            lines.append("// Layer Groups")
+            for group in self.groups.values():
+                lines.append(group.to_strudel_const(use_references=True))
+            lines.append("")
+
+        # Output arrangements as $: tracks
+        if self.arrangements:
+            lines.append("// Arrangement")
+            for arr in self.arrangements:
+                lines.append(f"$: {arr.to_strudel()}")
+
+        return "\n".join(lines)
+
+    def to_strudel_link(self) -> str:
+        """Generate a Strudel REPL link for this song."""
+        import base64
+
+        strudel_code = self.to_strudel()
+        encoded = base64.b64encode(strudel_code.encode("utf-8")).decode("utf-8")
+        return f"https://strudel.cc/#{encoded}"
+
+
+@dataclass
 class Composition:
     layers: list[Layer] = field(default_factory=list)
     bpm: int = 120

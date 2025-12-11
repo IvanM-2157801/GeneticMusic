@@ -302,7 +302,7 @@ def make_contextual_weights(weights: dict[str, float]) -> dict[str, float]:
 
 verse_context = make_contextual_weights(
     {
-        "rhythmic": 0.35,
+        "rhythmic": 0.65,
         "harmonic": 0.30,
         "density": 0.20,
         "voice_leading": 0.10,
@@ -386,9 +386,9 @@ kick_fitness = make_drum_fitness(
 # Hi-hat: busy, consistent, steady groove
 hihat_fitness = make_drum_fitness(
     {
-        "density": 0.4,  # Keep it busy
-        "consistency": 0.4,  # Steady pattern
-        "offbeat": 0.2,  # Some offbeat feel
+        "density": 0.2,  # Keep it busy
+        "consistency": 0.1,  # Steady pattern
+        "offbeat": 0.4,  # Some offbeat feel
     }
 )
 
@@ -431,21 +431,6 @@ MELODY_GENERATIONS = 30
 CHORD_GENERATIONS = 25
 
 
-# =============================================================================
-# LAYER CONFIGURATIONS
-# =============================================================================
-# Layers are organized by context_group - layers in the same group share
-# contextual fitness (they "hear" each other during evolution).
-#
-# layer_role determines the relationship between layers:
-#   - "chords": harmonic foundation (evolves first)
-#   - "drums": rhythmic foundation
-#   - "bass": harmonic + rhythmic bridge
-#   - "melody": main melodic line
-#   - "pad": harmonic fill
-#   - "lead": solo line (most freedom)
-
-
 def create_layers():
     """Create all layer configurations."""
     layers = []
@@ -458,7 +443,7 @@ def create_layers():
             beats_per_bar=BEATS_PER_BAR,
             is_chord_layer=True,
             num_chords=4,
-            notes_per_chord=3,
+            notes_per_chord=4,
             allowed_chord_types=["major", "minor"],
             chord_fitness_fn=main_chords,
             layer_role="verse",
@@ -660,25 +645,49 @@ def main():
             layer, rhythm = composer.evolved_layers[name]
             print(f"  - {name} ({layer.layer_role}): rhythm={rhythm}")
 
-    # Get composition
-    composition = composer.get_composition(bpm=BPM, random_scale=True)
-
     # Print summary
     composer.print_summary()
 
+    # ==========================================================================
+    # SONG STRUCTURE WITH ARRANGEMENT
+    # ==========================================================================
+    # Define layer groups (which layers play together)
+    layer_groups = {
+        "drums": ["kick", "hihat", "snare"],
+        "verse": ["verse_melody", "verse_bass", "chords"],
+        "chorus": ["chorus_melody", "chorus_bass", "chords"],
+    }
+
+    # Define song arrangement: (bars, group_or_layer_name)
+    # This creates a simple verse-chorus structure
+    song_arrangement = [
+        (4, "stack(drums, verse)"),  # 4 bars verse
+        (4, "stack(drums, chorus)"),  # 4 bars chorus
+        (4, "stack(drums, verse)"),  # 4 bars verse
+        (4, "stack(drums, chorus)"),  # 4 bars chorus
+    ]
+
+    # Get song structure with named constants
+    song = composer.get_song_structure(
+        bpm=BPM,
+        random_scale=True,
+        groups=layer_groups,
+        arrangement=song_arrangement,
+    )
+
     # Generate Strudel link
     print("\n" + "=" * 60)
-    print(" STRUDEL LINK")
+    print(" STRUDEL LINK (SONG STRUCTURE)")
     print("=" * 60)
-    link = composition.to_strudel_link()
+    link = song.to_strudel_link()
     print(f"\nOpen this link to hear your composition:")
     print(link)
 
     print("\n" + "=" * 60)
-    print(" STRUDEL CODE")
+    print(" STRUDEL CODE (SONG STRUCTURE)")
     print("=" * 60)
     print()
-    print(composition.to_strudel())
+    print(song.to_strudel())
     print()
 
 
