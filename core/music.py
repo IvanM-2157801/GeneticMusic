@@ -341,6 +341,9 @@ class Layer:
             result += f'.scale("{self.scale}")'
             result += f'.s("{self.instrument}")'
             result += self._build_effects_chain()
+            # Add bank if specified
+            if self.bank:
+                result += f'.bank("{self.bank}")'
             return result
 
         else:
@@ -371,6 +374,9 @@ class Layer:
             result += f'.scale("{self.scale}")'
             result += f'.s("{self.instrument}")'
             result += self._build_effects_chain()
+            # Add bank if specified
+            if self.bank:
+                result += f'.bank("{self.bank}")'
             return result
 
     def _chord_progression_to_strudel(self) -> str:
