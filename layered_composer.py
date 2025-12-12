@@ -7,8 +7,9 @@ Features:
 - Theme tracking for musical development
 """
 
+import random
 from dataclasses import dataclass, field
-from typing import Callable, Optional
+from typing import Callable, Optional, Union
 from core.genetic import GeneticAlgorithm, Individual
 from core.music import (
     Phrase,
@@ -43,7 +44,7 @@ class LayerConfig:
     """Configuration for a layer with separate rhythm and note evolution."""
 
     name: str
-    instrument: str
+    instrument: Union[str, list[str]]  # Single instrument or list to choose from
     bars: int = 1
     beats_per_bar: int = 8
     max_subdivision: int = 2
@@ -122,6 +123,12 @@ class LayerConfig:
     def total_beats(self) -> int:
         return self.bars * self.beats_per_bar
 
+    def get_instrument(self) -> str:
+        """Get the instrument, randomly selecting from list if multiple provided."""
+        if isinstance(self.instrument, list):
+            return random.choice(self.instrument)
+        return self.instrument
+
 
 # Layer role priority for evolution order
 # Lower numbers = evolved first (provides context for later layers)
@@ -171,6 +178,7 @@ class LayeredComposer:
         self.evolved_phrases: dict[str, Phrase] = {}  # layer_name -> Phrase
         self.evolved_chords: dict[str, ChordProgression] = {}  # layer_name -> ChordProgression
         self.evolved_layers: dict[str, tuple[Layer, str]] = {}  # layer_name -> (Layer, rhythm)
+        self.resolved_instruments: dict[str, str] = {}  # layer_name -> chosen instrument
 
         # Harmonic context (set after chord evolution)
         self.harmonic_context: Optional[HarmonicContext] = None
@@ -185,6 +193,16 @@ class LayeredComposer:
     def add_layer(self, config: LayerConfig) -> None:
         """Add a layer configuration."""
         self.layer_configs.append(config)
+
+    def get_instrument(self, config: LayerConfig) -> str:
+        """Get the resolved instrument for a layer.
+
+        If instrument is a list, randomly selects one on first call
+        and caches it for subsequent calls.
+        """
+        if config.name not in self.resolved_instruments:
+            self.resolved_instruments[config.name] = config.get_instrument()
+        return self.resolved_instruments[config.name]
 
     def evolve_layer_rhythm(self, config: LayerConfig, verbose: bool = True) -> str:
         """Evolve rhythm for a single layer."""
@@ -297,7 +315,7 @@ class LayeredComposer:
             layer = Layer(
                 name=config.name,
                 phrases=[phrase],
-                instrument=config.instrument,
+                instrument=self.get_instrument(config),
                 rhythm=rhythm,
                 is_drum=config.is_drum,
             )
@@ -336,7 +354,7 @@ class LayeredComposer:
                 best_layer = Layer(
                     name=config.name,
                     phrases=[best_phrase],
-                    instrument=config.instrument,
+                    instrument=self.get_instrument(config),
                     rhythm=rhythm,
                     is_drum=config.is_drum,
                 )
@@ -473,7 +491,7 @@ class LayeredComposer:
                 # Add drum layer to context for future layers
                 drum_layer = Layer(
                     name=config.name,
-                    instrument=config.instrument,
+                    instrument=self.get_instrument(config),
                     rhythm=rhythm,
                     is_drum=True,
                     drum_sound=config.drum_sound,
@@ -491,7 +509,7 @@ class LayeredComposer:
                 # Add chord layer to context for future layers
                 chord_layer = Layer(
                     name=config.name,
-                    instrument=config.instrument,
+                    instrument=self.get_instrument(config),
                     is_chord_layer=True,
                     chord_progression=chord_progression.chords,
                     gain=config.gain,
@@ -526,7 +544,7 @@ class LayeredComposer:
                 melodic_layer = Layer(
                     name=config.name,
                     phrases=[phrase],
-                    instrument=config.instrument,
+                    instrument=self.get_instrument(config),
                     rhythm=rhythm,
                     layer_role=config.layer_role,
                     context_group=config.context_group,
@@ -556,7 +574,7 @@ class LayeredComposer:
                     layer = Layer(
                         name=config.name,
                         phrases=[],
-                        instrument=config.instrument,
+                        instrument=self.get_instrument(config),
                         rhythm=rhythm,
                         gain=config.gain,
                         lpf=config.lpf,
@@ -591,7 +609,7 @@ class LayeredComposer:
                     layer = Layer(
                         name=config.name,
                         phrases=[],
-                        instrument=config.instrument,
+                        instrument=self.get_instrument(config),
                         rhythm="",
                         scale=layer_scale,
                         octave_shift=config.octave_shift,
@@ -632,7 +650,7 @@ class LayeredComposer:
                     layer = Layer(
                         name=config.name,
                         phrases=[phrase],
-                        instrument=config.instrument,
+                        instrument=self.get_instrument(config),
                         rhythm=rhythm if rhythm else "",
                         scale=layer_scale,
                         octave_shift=config.octave_shift,
@@ -701,7 +719,7 @@ class LayeredComposer:
                     layer = Layer(
                         name=config.name,
                         phrases=[],
-                        instrument=config.instrument,
+                        instrument=self.get_instrument(config),
                         rhythm=rhythm,
                         gain=config.gain,
                         lpf=config.lpf,
@@ -728,7 +746,7 @@ class LayeredComposer:
                     layer = Layer(
                         name=config.name,
                         phrases=[],
-                        instrument=config.instrument,
+                        instrument=self.get_instrument(config),
                         rhythm="",
                         scale=layer_scale,
                         octave_shift=config.octave_shift,
@@ -761,7 +779,7 @@ class LayeredComposer:
                     layer = Layer(
                         name=config.name,
                         phrases=[phrase],
-                        instrument=config.instrument,
+                        instrument=self.get_instrument(config),
                         rhythm=rhythm if rhythm else "",
                         scale=layer_scale,
                         octave_shift=config.octave_shift,
@@ -849,7 +867,7 @@ class LayeredComposer:
             phrase = self.evolved_phrases.get(config.name)
             chord_prog = self.evolved_chords.get(config.name)
 
-            print(f"\n{config.name.upper()} ({config.instrument}):")
+            print(f"\n{config.name.upper()} ({self.get_instrument(config)}):")
 
             if config.is_chord_layer:
                 print(f"  Type: Chord Layer")

@@ -459,7 +459,7 @@ def create_layers():
     layers.append(
         LayerConfig(
             name="verse_melody",
-            instrument="supersaw",
+            instrument=["piano", "gm_acoustic_guitar_nylon", "supersaw"],
             bars=BARS,
             beats_per_bar=BEATS_PER_BAR * 4,  # 16 beats for melody
             max_subdivision=2,
