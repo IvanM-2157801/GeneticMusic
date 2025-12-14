@@ -656,15 +656,24 @@ def main():
         "drums": ["kick", "hihat", "snare"],
         "verse": ["verse_melody", "verse_bass", "chords"],
         "chorus": ["chorus_melody", "chorus_bass", "chords"],
+        "intro": ["chords"],  # Optional intro section"]
+        "outro_part1": ["verse_bass", "verse_melody"],  # Optional outro section
+        "outro_part2": ["verse_melody"],
+        "bridge": ["chorus_melody", "chords"],  # Optional bridge section
     }
 
     # Define song arrangement: (bars, group_or_layer_name)
     # This creates a simple verse-chorus structure
     song_arrangement = [
+        (2, "stack(intro)"),   # 2 bars intro
+        (2, "stack(verse)"),  # 2 bars verse intro
         (4, "stack(drums, verse)"),  # 4 bars verse
         (4, "stack(drums, chorus)"),  # 4 bars chorus
+        (2, "stack(bridge)"),  # 2 bars bridge
         (4, "stack(drums, verse)"),  # 4 bars verse
         (4, "stack(drums, chorus)"),  # 4 bars chorus
+        (1, "stack(outro_part1)"),  # 1 bar outro part 1
+        (1, "stack(outro_part2)"),  # 1 bar outro part 2
     ]
 
     # Get song structure with named constants
