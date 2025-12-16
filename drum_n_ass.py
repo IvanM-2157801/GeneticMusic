@@ -15,6 +15,7 @@ from fitness.rhythm import (
     rhythm_syncopation,
     rhythm_groove,
     rhythm_consistency,
+    rhythm_offbeat_emphasis,
 )
 from fitness.drums import (
     strong_beat_emphasis,
@@ -59,7 +60,14 @@ def make_lofi_rhythm_fitness(weights: dict[str, float]):
         "density": rhythm_density,
         "syncopation": rhythm_syncopation,
         "consistency": rhythm_consistency,
+        "offbeat": rhythm_offbeat_emphasis,
         "rests": rhythm_rest_ratio,
+        "strong_beat": strong_beat_emphasis,
+        "backbeat": backbeat_emphasis,
+        "sparsity": sparsity,
+        "simplicity": simplicity,
+        "drum_offbeat": offbeat_pattern,
+        "perfect_consistency": perfect_consistency,
     }
 
     def fitness(rhythm: str) -> float:
@@ -206,10 +214,13 @@ lofi_melody = make_lofi_melody_fitness(
 # Rhythm: laid-back, groovy
 lofi_rhythm = make_lofi_rhythm_fitness(
     {
-        "groove": 0.4,
-        "syncopation": 0.3,  # Some swing
-        "density": 0.2,
-        "rests": -0.2,  # Don't want too sparse
+        "complexity": 0.3,
+        "density": 0.3,
+        "consistency": 0.15, 
+        "offbeat": 0.15,
+        "rests": -0.3,
+        "strong_beat": 0.65,
+        "sparsity": 0.15
     }
 )
 
@@ -323,12 +334,12 @@ BPM = 160
 BARS = 2
 BEATS_PER_BAR = 4
 
-POPULATION_SIZE = 100
+POPULATION_SIZE = 50
 MUTATION_RATE = 0.2
 ELITISM_COUNT = 5
-RHYTHM_GENERATIONS = 30
-MELODY_GENERATIONS = 35
-CHORD_GENERATIONS = 30
+RHYTHM_GENERATIONS = 20
+MELODY_GENERATIONS = 20
+CHORD_GENERATIONS = 20
 
 
 def create_lofi_layers():
@@ -339,6 +350,28 @@ def create_lofi_layers():
     layers.append(
         LayerConfig(
             name="melody_a",
+            instrument="supersaw",
+            bars=BARS,
+            beats_per_bar=BEATS_PER_BAR * 2,
+            max_subdivision=2,
+            octave_range=(4, 5),
+            base_octave=4,
+            rhythm_fitness_fn=lofi_rhythm,
+            melody_fitness_fn=lofi_melody,
+            layer_role="melody",
+            context_group="main",
+            gain=0.4,
+            lpf=1000,
+            room=0.5,
+            delay=0.3,
+            delaytime=0.375,  # Dotted eighth delay
+            delayfeedback=0.4,
+        )
+    )
+    
+    layers.append(
+        LayerConfig(
+            name="melody_b",
             instrument="supersaw",
             bars=BARS,
             beats_per_bar=BEATS_PER_BAR * 2,
@@ -391,7 +424,7 @@ def create_lofi_layers():
             context_group="",
             gain=0.3,
             lpf=2000,  # Warm kick
-            bank="korgddm110",
+            bank="alesissr16",
         )
     )
 
@@ -410,7 +443,7 @@ def create_lofi_layers():
             gain=0.5,
             lpf=4000,
             room=0.15,  # Bit of room on snare
-            bank="korgddm110",
+            bank="alesissr16",
         )
     )
 
@@ -428,7 +461,7 @@ def create_lofi_layers():
             context_group="",
             gain=0.15,
             lpf=6000,
-            bank="korgddm110",
+            bank="alesissr16",
         )
     )
 
@@ -476,10 +509,12 @@ def main():
 
     # Lofi structure with intro buildup and alternating melodies
     song_arrangement = [
-        (2, "stack(melody_a)"),  # 2 bars - just bass and chords
-        # (4, "stack(melodic_a)"),  # 4 bars - melody A
-        # (4, "stack(drums, melodic_a)"),  # 4 bars - back to melody A
-        # (4, "stack(drums, melodic_b)"),  # 4 bars - melody B
+        (2, 'stack(bass).lpf(300).lpenv("0 1 2 3".slow(2))'),
+        (2, "stack(bass, melody_a.slow(4))"),  # 2 bars - just bass and chords
+        (4, "stack(kick, snare, hihat, melody_a.slow(2), bass)"),  # 4 bars - back to melody A
+        (2, 'stack(kick, snare, melody_b.slow(2).lpenv("3 1 2 3"), bass)'),
+        (2, "stack(kick, snare, bass)"),
+        (4, "stack(kick, snare, hihat, melody_a.slow(2), bass)"),  # 4 bars - back to melody A
     ]
 
     # Use a chill minor scale
