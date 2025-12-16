@@ -324,8 +324,18 @@ def random_chord_progression(
     return ChordProgression(chords)
 
 
-def mutate_chord(chord: Chord, notes_per_chord: int = 3) -> Chord:
-    """Mutate a single chord."""
+def mutate_chord(
+    chord: Chord,
+    notes_per_chord: int = 3,
+    allowed_types: list[str] | None = None,
+) -> Chord:
+    """Mutate a single chord.
+
+    Args:
+        chord: The chord to mutate
+        notes_per_chord: Number of notes per chord
+        allowed_types: List of chord type names to choose from during "type" mutation
+    """
     new_chord = Chord(chord.root_degree, chord.intervals.copy())
 
     mutation_type = random.choice(["root", "type", "voicing"])
@@ -336,8 +346,11 @@ def mutate_chord(chord: Chord, notes_per_chord: int = 3) -> Chord:
         new_chord.root_degree = (new_chord.root_degree + step) % 7
 
     elif mutation_type == "type":
-        # Change chord quality
-        if notes_per_chord == 2:
+        # Change chord quality - respect allowed_types if provided
+        if allowed_types:
+            chord_type = random.choice(allowed_types)
+            new_chord.intervals = CHORD_TYPES.get(chord_type, [0, 4, 7])[:notes_per_chord]
+        elif notes_per_chord == 2:
             new_chord.intervals = [0, random.choice([3, 4, 5, 7])]
         elif notes_per_chord == 3:
             new_chord.intervals = random.choice(
@@ -362,12 +375,20 @@ def mutate_chord_progression(
     progression: ChordProgression,
     mutation_rate: float = 0.1,
     notes_per_chord: int = 3,
+    allowed_types: list[str] | None = None,
 ) -> ChordProgression:
-    """Mutate a chord progression."""
+    """Mutate a chord progression.
+
+    Args:
+        progression: The chord progression to mutate
+        mutation_rate: Probability of mutating each chord
+        notes_per_chord: Number of notes per chord
+        allowed_types: List of chord type names to choose from during mutation
+    """
     new_chords = []
     for chord in progression.chords:
         if random.random() < mutation_rate:
-            new_chords.append(mutate_chord(chord, notes_per_chord))
+            new_chords.append(mutate_chord(chord, notes_per_chord, allowed_types))
         else:
             new_chords.append(Chord(chord.root_degree, chord.intervals.copy()))
     return ChordProgression(new_chords)
