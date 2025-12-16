@@ -163,6 +163,7 @@ class LayeredComposer:
         chord_generations: int = 25,
         use_context: bool = True,  # Enable inter-layer dependencies
         use_harmonic_context: bool = True,  # Enable chord-aware melody evolution
+        fitness_threshold: float = 0.0,  # Early stopping threshold (0 = disabled)
     ):
         self.population_size = population_size
         self.mutation_rate = mutation_rate
@@ -172,6 +173,7 @@ class LayeredComposer:
         self.chord_generations = chord_generations
         self.use_context = use_context
         self.use_harmonic_context = use_harmonic_context
+        self.fitness_threshold = fitness_threshold
 
         self.layer_configs: list[LayerConfig] = []
         self.evolved_rhythms: dict[str, str] = {}  # layer_name -> rhythm string
@@ -189,6 +191,9 @@ class LayeredComposer:
         # Scale info (set before evolution)
         self.scale_root: str = "c"
         self.scale_type: str = "major"
+
+        # Final fitness scores for each layer phase
+        self.final_fitness: dict[str, dict[str, float]] = {}  # layer_name -> {"rhythm": x, "melody": y, "chord": z}
 
     def add_layer(self, config: LayerConfig) -> None:
         """Add a layer configuration."""
@@ -225,6 +230,7 @@ class LayeredComposer:
 
         # Evolve
         best_fitness = 0.0
+        final_gen = 0
         for gen in range(self.rhythm_generations):
             population = ga.evolve(
                 population=population,
@@ -237,15 +243,28 @@ class LayeredComposer:
 
             best = population[0]
             best_fitness = best.fitness
+            final_gen = gen
 
             if verbose and (gen % 5 == 0 or gen == self.rhythm_generations - 1):
                 print(
                     f"  Gen {gen:3d}: Best fitness = {best_fitness:.4f}, rhythm = {best.genome}"
                 )
 
+            # Early stopping if threshold reached
+            if self.fitness_threshold > 0 and best_fitness >= self.fitness_threshold:
+                if verbose:
+                    print(f"  ✓ Early stop: fitness {best_fitness:.4f} >= threshold {self.fitness_threshold:.2f}")
+                break
+
         best_rhythm = population[0].genome
         if verbose:
-            print(f"✓ Final rhythm: {best_rhythm} (fitness: {best_fitness:.4f})")
+            print(f"✓ Final rhythm: {best_rhythm} (fitness: {best_fitness:.4f}, gen: {final_gen + 1}/{self.rhythm_generations})")
+
+        # Store fitness score
+        if config.name not in self.final_fitness:
+            self.final_fitness[config.name] = {}
+        self.final_fitness[config.name]["rhythm"] = best_fitness
+        self.final_fitness[config.name]["rhythm_gen"] = final_gen + 1
 
         return best_rhythm
 
@@ -330,6 +349,7 @@ class LayeredComposer:
             return phrase_with_rhythm(child, rhythm)
 
         best_fitness = 0.0
+        final_gen = 0
         for gen in range(self.melody_generations):
             population = ga.evolve(
                 population=population,
@@ -340,15 +360,29 @@ class LayeredComposer:
 
             best = population[0]
             best_fitness = best.fitness
+            final_gen = gen
 
             if verbose and (gen % 10 == 0 or gen == self.melody_generations - 1):
                 print(f"  Gen {gen:3d}: Best fitness = {best_fitness:.4f}")
 
+            # Early stopping if threshold reached
+            if self.fitness_threshold > 0 and best_fitness >= self.fitness_threshold:
+                if verbose:
+                    print(f"  ✓ Early stop: fitness {best_fitness:.4f} >= threshold {self.fitness_threshold:.2f}")
+                break
+
         best_phrase = population[0].genome
         if verbose:
-            print(f"✓ Final melody fitness: {best_fitness:.4f}")
+            print(f"✓ Final melody fitness: {best_fitness:.4f} (gen: {final_gen + 1}/{self.melody_generations})")
 
-            # Log detailed fitness breakdown if using contextual fitness
+        # Store fitness score
+        if config.name not in self.final_fitness:
+            self.final_fitness[config.name] = {}
+        self.final_fitness[config.name]["melody"] = best_fitness
+        self.final_fitness[config.name]["melody_gen"] = final_gen + 1
+
+        # Log detailed fitness breakdown if using contextual fitness
+        if verbose:
             from fitness.contextual import ContextualFitness
             if isinstance(contextual_fitness, ContextualFitness):
                 best_layer = Layer(
@@ -413,6 +447,7 @@ class LayeredComposer:
 
         # Evolve
         best_fitness = 0.0
+        final_gen = 0
         for gen in range(self.chord_generations):
             population = ga.evolve(
                 population=population,
@@ -423,6 +458,7 @@ class LayeredComposer:
 
             best = population[0]
             best_fitness = best.fitness
+            final_gen = gen
 
             if verbose and (gen % 5 == 0 or gen == self.chord_generations - 1):
                 chord_summary = " → ".join(
@@ -432,9 +468,21 @@ class LayeredComposer:
                     f"  Gen {gen:3d}: Best fitness = {best_fitness:.4f}, chords = {chord_summary}"
                 )
 
+            # Early stopping if threshold reached
+            if self.fitness_threshold > 0 and best_fitness >= self.fitness_threshold:
+                if verbose:
+                    print(f"  ✓ Early stop: fitness {best_fitness:.4f} >= threshold {self.fitness_threshold:.2f}")
+                break
+
         best_progression = population[0].genome
         if verbose:
-            print(f"✓ Final chord fitness: {best_fitness:.4f}")
+            print(f"✓ Final chord fitness: {best_fitness:.4f} (gen: {final_gen + 1}/{self.chord_generations})")
+
+        # Store fitness score
+        if config.name not in self.final_fitness:
+            self.final_fitness[config.name] = {}
+        self.final_fitness[config.name]["chord"] = best_fitness
+        self.final_fitness[config.name]["chord_gen"] = final_gen + 1
 
         return best_progression
 
