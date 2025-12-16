@@ -1,16 +1,4 @@
 #!/usr/bin/env python3
-"""Lofi hip-hop demo with chill vibes.
-
-Run with: python lofi_demo.py
-
-Features:
-- Jazzy 7th chords with smooth progressions
-- Mellow, smooth melodies
-- Laid-back drum patterns (boom bap style)
-- Vinyl crackle and warm effects
-"""
-
-from core.music import NoteName
 from fitness.base import (
     FitnessFunction,
     note_variety,
@@ -34,6 +22,13 @@ from fitness.drums import (
     sparsity,
     simplicity,
     offbeat_pattern,
+    # Advanced primitives for DnB
+    hit_count_score,
+    hits_at_positions,
+    avoid_positions,
+    single_hits_at_positions,
+    perfect_consistency,
+    uniform_subdivision,
 )
 from fitness.chords import (
     ChordFitnessFunction,
@@ -200,10 +195,10 @@ lofi_chords = make_lofi_chord_fitness(
 # Melody: smooth, pentatonic-friendly, with space
 lofi_melody = make_lofi_melody_fitness(
     {
-        "variety": 0.2,
+        "variety": 0.9,
         "smoothness": 0.5,  # Very smooth intervals
         "scale": 0.3,
-        "rests": 0.1,  # Some breathing room
+        "rests": 0.4,  # Some breathing room
     },
     scale=PENTATONIC,
 )
@@ -230,150 +225,90 @@ lofi_bass_rhythm = make_lofi_rhythm_fitness(
 # =============================================================================
 # DnB-SPECIFIC FITNESS FUNCTIONS
 # =============================================================================
+# These use the primitive functions from fitness/drums.py for composability
 
 
 def dnb_kick_fitness(rhythm: str) -> float:
-    """DnB kick fitness - SPARSE, strategic placement like Amen break.
-    
-    Amen break: [bd ~ bd ~] ~ [~ ~ bd bd] [bd ~ ~ ~]
-    In our 8-beat encoding:
-    - Beat 0: YES (the anchor)
-    - Beat 1: maybe
-    - Beat 2: NO (snare)
-    - Beat 3: NO (mostly)
-    - Beat 4: maybe
-    - Beat 5: maybe (syncopation)
-    - Beat 6: NO (snare)
-    - Beat 7: NO
-    
-    Total: 3-5 hits maximum (very sparse!)
+    """DnB kick fitness - Amen break style.
+
+    Amen kick pattern: `10010100` or `11010100`
+    - Beat 0: ALWAYS (the anchor)
+    - Beat 5: CRITICAL (syncopation before second snare)
+    - Beats 2,6: NEVER (snare territory)
+    - Total: 3-4 hits (very sparse)
     """
-    if not rhythm:
+    if not rhythm or len(rhythm) < 8:
         return 0.0
 
     score = 0.0
-    length = len(rhythm)
-    if length < 8:
-        return 0.0
 
-    # Count total hits
-    total_hits = sum(int(c) for c in rhythm)
-    
-    # 1. CRITICAL: Must be SPARSE (3-5 hits total)
-    if total_hits >= 3 and total_hits <= 5:
-        score += 0.3
-    elif total_hits >= 6 and total_hits <= 7:
-        score += 0.1  # Acceptable
-    else:
-        score += 0.0  # Too few or too many
+    # 1. MUST have kick on beat 0 (the Amen anchor) - highest priority
+    score += 0.35 * hits_at_positions(rhythm, [0])
 
-    # 2. MUST have kick on beat 0
-    if rhythm[0] != "0":
-        score += 0.3
+    # 2. Beat 5 syncopation is the Amen signature (before second snare)
+    score += 0.25 * hits_at_positions(rhythm, [5])
 
-    # 3. NO kicks on backbeat (2, 6) - that's snare territory
-    if rhythm[2] == "0" and rhythm[6] == "0":
-        score += 0.2
-    else:
-        score -= 0.2  # Penalty
+    # 3. NEVER on backbeat (2, 6) - snare territory, strict avoidance
+    score += 0.25 * avoid_positions(rhythm, [2, 6])
 
-    # 4. Reward kicks on offbeats (1, 5) for syncopation
-    offbeat_score = 0
-    if rhythm[1] != "0":
-        offbeat_score += 0.5
-    if rhythm[5] != "0":
-        offbeat_score += 0.5
-    score += 0.2 * min(offbeat_score, 1.0)
+    # 4. Sparse: exactly 3-4 hits for authentic Amen feel
+    score += 0.15 * hit_count_score(rhythm, 3, 4)
 
     return max(0.0, min(1.0, score))
 
 
 def dnb_snare_fitness(rhythm: str) -> float:
-    """DnB snare fitness - SPARSE backbeat only.
-    
-    Amen break snare: ~ [sd ~ ~ sd] [~ sd ~ ~] [~ ~ oh ~]
-    In our 8-beat encoding:
-    - Beat 0: REST (no snare)
-    - Beat 1: maybe 1 hit
-    - Beat 2: SINGLE hit (backbeat) 
-    - Beat 3: maybe 1 hit
-    - Beat 4: REST (no snare)
-    - Beat 5: REST (no snare) 
-    - Beat 6: SINGLE hit (backbeat)
-    - Beat 7: maybe 1 hit
-    
-    Total hits: 2-4 ONLY (very sparse!)
+    """DnB snare fitness - Amen break style.
+
+    Amen snare pattern: `00100010` (exactly 2 hits on backbeat)
+    - Beats 2,6: ALWAYS (clean backbeat)
+    - All other beats: NEVER
+    - Total: exactly 2 hits
+    - Single punchy hits, no rolls
     """
-    if not rhythm:
+    if not rhythm or len(rhythm) < 8:
         return 0.0
 
     score = 0.0
-    length = len(rhythm)
-    if length < 8:
-        return 0.0
 
-    # Count total hits
-    total_hits = sum(int(c) for c in rhythm)
-    
-    # 1. CRITICAL: Must be SPARSE (only 2-4 hits total)
-    if total_hits >= 2 and total_hits <= 4:
-        score += 0.4
-    elif total_hits >= 5 and total_hits <= 6:
-        score += 0.2  # Acceptable but busier
-    else:
-        score += 0.0  # Too sparse or too busy
+    # 1. MUST have backbeat on 2 and 6 - highest priority
+    score += 0.4 * hits_at_positions(rhythm, [2, 6])
 
-    # 2. MUST have backbeat on 2 and 6
-    backbeat_positions = [2, 6]
-    backbeat_hits = sum(1 for i in backbeat_positions if rhythm[i] != "0")
-    score += 0.4 * (backbeat_hits / 2.0)
+    # 2. Backbeat should be SINGLE hits (punchy, not subdivided)
+    score += 0.25 * single_hits_at_positions(rhythm, [2, 6])
 
-    # 3. Backbeat should be SINGLE hits, not subdivisions
-    if rhythm[2] == "1":
-        score += 0.1
-    if rhythm[6] == "1":
-        score += 0.1
+    # 3. Exactly 2 hits for clean Amen snare
+    score += 0.2 * hit_count_score(rhythm, 2, 2)
 
-    # 4. NO snares on beats 0, 4 (those are kick positions)
-    if rhythm[0] == "0" and rhythm[4] == "0":
-        score += 0.0  # Good, no penalty needed
-    else:
-        score -= 0.2  # Penalty
+    # 4. NO snares anywhere else (avoid kick positions and offbeats)
+    score += 0.15 * avoid_positions(rhythm, [0, 1, 3, 4, 5, 7])
 
     return max(0.0, min(1.0, score))
 
 
 def dnb_hihat_fitness(rhythm: str) -> float:
     """DnB hihat/ride fitness - consistent driving 8th notes.
-    
-    Amen break ride: [rd ~ rd ~] [rd ~ rd ~] (repeated)
-    In our encoding: all 2s (8th notes) or all 1s
-    Target: "22222222" or "11111111"
+
+    Uses primitives:
+    - perfect_consistency: All same subdivision value
+    - uniform_subdivision: Target "2" (8th notes)
+    - rhythm_rest_ratio: Penalize rests
     """
     if not rhythm:
         return 0.0
 
+    from fitness.rhythm import rhythm_rest_ratio
+
     score = 0.0
-    length = len(rhythm)
 
     # 1. PERFECT CONSISTENCY - same value repeated (critical!)
-    unique_vals = len(set(rhythm))
-    if unique_vals == 1 and rhythm[0] != "0":  # All same, no rests
-        score += 0.5
-    elif unique_vals == 2 and "0" in rhythm:  # One value + some rests
-        score += 0.2
-    elif unique_vals <= 2:  # Two different subdivisions
-        score += 0.1
+    score += 0.4 * perfect_consistency(rhythm)
 
-    # 2. Prefer 8th notes (2s) or constant quarter notes (1s)
-    if rhythm == "2" * length:
-        score += 0.3  # Perfect 8th note groove!
-    elif rhythm == "1" * length:
-        score += 0.2  # Acceptable quarter note groove
+    # 2. Prefer 8th notes (all 2s)
+    score += 0.35 * uniform_subdivision(rhythm, "2")
 
     # 3. No rests (driving timekeeping)
-    rest_count = rhythm.count("0")
-    score += 0.2 * (1.0 - rest_count / length)
+    score += 0.25 * (1.0 - rhythm_rest_ratio(rhythm))
 
     return max(0.0, min(1.0, score))
 
@@ -384,11 +319,7 @@ snare = dnb_snare_fitness
 hihat = dnb_hihat_fitness
 
 
-# =============================================================================
-# EVOLUTION PARAMETERS
-# =============================================================================
-
-BPM = 160  # Very slow, chill tempo (setcpm(6) = 24 BPM)
+BPM = 160
 BARS = 2
 BEATS_PER_BAR = 4
 
@@ -400,22 +331,17 @@ MELODY_GENERATIONS = 35
 CHORD_GENERATIONS = 30
 
 
-# =============================================================================
-# LAYER CONFIGURATIONS
-# =============================================================================
-
-
 def create_lofi_layers():
     """Create lofi layer configurations."""
     layers = []
 
-    # Main melody A - nylon guitar for that cozy lofi vibe
+    # Main melody A
     layers.append(
         LayerConfig(
             name="melody_a",
-            instrument="acoustic_guitar_nylon",
+            instrument="supersaw",
             bars=BARS,
-            beats_per_bar=BEATS_PER_BAR * 2,  # 8 beats for melody
+            beats_per_bar=BEATS_PER_BAR * 2,
             max_subdivision=2,
             octave_range=(4, 5),
             base_octave=4,
@@ -424,12 +350,11 @@ def create_lofi_layers():
             layer_role="melody",
             context_group="main",
             gain=0.4,
-            lpf=3000,
+            lpf=1000,
             room=0.5,
             delay=0.3,
             delaytime=0.375,  # Dotted eighth delay
             delayfeedback=0.4,
-            bank="gm",  # General MIDI bank for guitar
         )
     )
 
@@ -447,21 +372,18 @@ def create_lofi_layers():
             melody_fitness_fn=lofi_melody,
             layer_role="bass",
             context_group="main",
-            gain=0.15,
+            gain=0.35,
             lpf=300,
         )
     )
-
-    # --- DRUMS ---
-    # Boom-bap style with vinyl character
 
     layers.append(
         LayerConfig(
             name="kick",
             instrument="bd",
             bars=BARS,
-            beats_per_bar=BEATS_PER_BAR,  # 4 beats per bar = 8 total beats
-            max_subdivision=2,  # Allow pairs and syncopation
+            beats_per_bar=BEATS_PER_BAR,
+            max_subdivision=2,
             is_drum=True,
             drum_sound="bd",
             rhythm_fitness_fn=kick,
@@ -513,11 +435,6 @@ def create_lofi_layers():
     return layers
 
 
-# =============================================================================
-# MAIN
-# =============================================================================
-
-
 def main():
     print("=" * 60)
     print(" LOFI HIP-HOP DEMO")
@@ -557,32 +474,18 @@ def main():
     # Print summary
     composer.print_summary()
 
-    # ==========================================================================
-    # SONG STRUCTURE
-    # ==========================================================================
-    layer_groups = {
-        "drums": ["kick", "snare", "hihat"],
-        "intro": ["bass", "chords"],  # Intro without melody
-        "melodic_a": ["melody_a", "bass", "chords"],  # Section with melody A
-        "melodic_b": ["melody_b", "bass", "chords"],  # Section with melody B
-    }
-
     # Lofi structure with intro buildup and alternating melodies
     song_arrangement = [
-        (2, "stack(drums)"),
-        # (2, "stack(intro)"),  # 2 bars - just bass and chords
-        # (2, "stack(intro, drums)"),  # 2 bars - add drums
-        # (4, "stack(drums, melodic_a)"),  # 4 bars - melody A
-        # (4, "stack(drums, melodic_b)"),  # 4 bars - melody B
+        (2, "stack(melody_a)"),  # 2 bars - just bass and chords
+        # (4, "stack(melodic_a)"),  # 4 bars - melody A
         # (4, "stack(drums, melodic_a)"),  # 4 bars - back to melody A
-        # (2, "stack(intro, drums)"),  # 2 bars - breakdown
+        # (4, "stack(drums, melodic_b)"),  # 4 bars - melody B
     ]
 
     # Use a chill minor scale
     song = composer.get_song_structure(
         bpm=BPM,
         random_scale=False,  # We'll set it manually for lofi vibe
-        groups=layer_groups,
         arrangement=song_arrangement,
     )
 

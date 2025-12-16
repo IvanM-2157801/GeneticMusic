@@ -3,11 +3,21 @@
 These functions evaluate rhythm strings for different drum roles.
 Each returns 0.0-1.0 and can be combined with weights.
 
-DRUM ROLE PRIMITIVES:
+DRUM ROLE PRIMITIVES (Basic):
 - strong_beat_emphasis(rhythm)  : Activity on beats 1/5 (higher = more downbeat)
 - backbeat_emphasis(rhythm)     : Activity on beats 3/7 (higher = more backbeat)
 - sparsity(rhythm)              : Inverse of density (higher = more sparse)
 - simplicity(rhythm)            : Ratio of simple hits (higher = more single hits)
+- offbeat_pattern(rhythm)       : Activity on offbeats (higher = more offbeat)
+
+DRUM ROLE PRIMITIVES (Advanced):
+- total_hits(rhythm)            : Count of total note subdivisions
+- hit_count_score(rhythm, min, max) : Score for hit count in target range
+- hits_at_positions(rhythm, positions) : Score for hits at specific beat positions
+- avoid_positions(rhythm, positions)   : Score for NOT having hits at positions
+- single_hits_at_positions(rhythm, positions) : Score for "1" at positions
+- perfect_consistency(rhythm)   : Score for all beats being same subdivision
+- uniform_subdivision(rhythm, target) : Score for matching target pattern
 
 USAGE:
 Combine these primitives for different drum sounds:
@@ -35,6 +45,15 @@ Combine these primitives for different drum sounds:
             0.5 * backbeat_emphasis(rhythm) +
             0.3 * sparsity(rhythm) +
             0.2 * simplicity(rhythm)
+        )
+
+    # DnB kick: sparse, avoid backbeats, anchor on beat 1
+    def dnb_kick_fitness(rhythm: str) -> float:
+        return (
+            0.3 * hit_count_score(rhythm, 3, 5) +  # 3-5 hits
+            0.3 * hits_at_positions(rhythm, [0]) +  # Anchor beat 1
+            0.2 * avoid_positions(rhythm, [2, 6]) +  # Avoid snare positions
+            0.2 * hits_at_positions(rhythm, [1, 5])  # Offbeat syncopation
         )
 """
 
@@ -153,3 +172,170 @@ def offbeat_pattern(rhythm: str) -> float:
             offbeat_score += 0.5
 
     return offbeat_score / total_beats
+
+
+# =============================================================================
+# ADVANCED PRIMITIVES - For fine-grained drum pattern control
+# =============================================================================
+
+
+def total_hits(rhythm: str) -> int:
+    """Count total note subdivisions in rhythm.
+
+    Sum of all subdivision values (0-4 per beat).
+    '0' = 0 hits, '1' = 1 hit, '2' = 2 hits, etc.
+
+    Returns:
+        Integer count of total hits/notes
+    """
+    if not rhythm:
+        return 0
+    return sum(int(c) for c in rhythm)
+
+
+def hit_count_score(rhythm: str, target_min: int, target_max: int) -> float:
+    """Score rhythm based on hit count falling within target range (0-1).
+
+    Returns 1.0 if hit count is within [target_min, target_max].
+    Returns partial score for close misses.
+
+    Args:
+        rhythm: Rhythm string
+        target_min: Minimum acceptable hit count
+        target_max: Maximum acceptable hit count
+
+    High = sparse patterns (kick, snare)
+    Low = dense patterns (hi-hat)
+    """
+    if not rhythm:
+        return 0.0
+
+    hits = total_hits(rhythm)
+
+    if target_min <= hits <= target_max:
+        return 1.0
+    elif hits < target_min:
+        # Partial score for being close
+        distance = target_min - hits
+        return max(0.0, 1.0 - distance * 0.2)
+    else:
+        # Partial score for being close
+        distance = hits - target_max
+        return max(0.0, 1.0 - distance * 0.2)
+
+
+def hits_at_positions(rhythm: str, positions: list[int]) -> float:
+    """Score for having hits at specific beat positions (0-1).
+
+    Returns ratio of specified positions that have hits (non-zero).
+
+    Args:
+        rhythm: Rhythm string
+        positions: List of beat indices to check (0-indexed)
+
+    High = hits where expected (anchor kicks, backbeats)
+    Low = misses at expected positions
+    """
+    if not rhythm or not positions:
+        return 0.0
+
+    valid_positions = [p for p in positions if p < len(rhythm)]
+    if not valid_positions:
+        return 0.0
+
+    hits = sum(1 for p in valid_positions if rhythm[p] != "0")
+    return hits / len(valid_positions)
+
+
+def avoid_positions(rhythm: str, positions: list[int]) -> float:
+    """Score for NOT having hits at specific positions (0-1).
+
+    Returns ratio of specified positions that are rests.
+    Use to keep kick away from snare positions, etc.
+
+    Args:
+        rhythm: Rhythm string
+        positions: List of beat indices to avoid (0-indexed)
+
+    High = successfully avoiding positions (e.g., kick avoiding snare beats)
+    Low = unwanted hits at forbidden positions
+    """
+    if not rhythm or not positions:
+        return 1.0
+
+    valid_positions = [p for p in positions if p < len(rhythm)]
+    if not valid_positions:
+        return 1.0
+
+    rests = sum(1 for p in valid_positions if rhythm[p] == "0")
+    return rests / len(valid_positions)
+
+
+def single_hits_at_positions(rhythm: str, positions: list[int]) -> float:
+    """Score for having exactly '1' (single hit) at positions (0-1).
+
+    Unlike hits_at_positions, this specifically wants single quarter-note hits,
+    not subdivided beats. Good for punchy snares/kicks.
+
+    Args:
+        rhythm: Rhythm string
+        positions: List of beat indices to check (0-indexed)
+
+    High = clean single hits at positions (punchy drums)
+    Low = subdivided or missing hits
+    """
+    if not rhythm or not positions:
+        return 0.0
+
+    valid_positions = [p for p in positions if p < len(rhythm)]
+    if not valid_positions:
+        return 0.0
+
+    singles = sum(1 for p in valid_positions if rhythm[p] == "1")
+    return singles / len(valid_positions)
+
+
+def perfect_consistency(rhythm: str) -> float:
+    """Score for all beats having the same subdivision value (0-1).
+
+    Returns 1.0 if all characters are identical (e.g., "22222222").
+    Good for driving hi-hat patterns.
+
+    High = perfectly consistent pattern (driving hi-hats)
+    Low = varied subdivisions
+    """
+    if not rhythm:
+        return 0.0
+
+    unique_vals = len(set(rhythm))
+    if unique_vals == 1:
+        return 1.0
+    elif unique_vals == 2:
+        return 0.5
+    else:
+        return max(0.0, 1.0 - (unique_vals - 1) * 0.25)
+
+
+def uniform_subdivision(rhythm: str, target: str) -> float:
+    """Score for matching a specific uniform subdivision pattern (0-1).
+
+    Returns 1.0 if rhythm equals target repeated for its length.
+    E.g., uniform_subdivision("22222222", "2") returns 1.0
+
+    Args:
+        rhythm: Rhythm string
+        target: Single character target subdivision ("1", "2", "3", or "4")
+
+    High = matches target subdivision pattern
+    Low = doesn't match
+    """
+    if not rhythm or not target:
+        return 0.0
+
+    expected = target * len(rhythm)
+    if rhythm == expected:
+        return 1.0
+
+    # Partial score based on how many beats match
+    matches = sum(1 for i in range(len(rhythm)) if rhythm[i] == target)
+    return matches / len(rhythm)
