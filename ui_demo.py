@@ -1,15 +1,3 @@
-#!/usr/bin/env python3
-"""Interactive UI for GeneticMusic using Gradio.
-
-Run with: python ui_demo.py
-
-Provides sliders for ALL available fitness functions to experiment
-with how different weights affect the evolved music.
-
-Requirements:
-    pip install gradio
-"""
-
 import gradio as gr
 from core.music import Phrase, Layer, NoteName
 from core.genome_ops import ChordProgression
@@ -189,8 +177,7 @@ def make_chord_fitness(weights: dict[str, float]):
     return CustomChordFitness()
 
 
-# =============================================================================
-# PYTHON PRESET GENERATOR
+# ============================================================================= # PYTHON PRESET GENERATOR
 # =============================================================================
 
 
@@ -661,7 +648,7 @@ def generate_music(
         "rhythmic_variety": m_rhythmic_variety,
     }
 
-    # Build chord fitness weights dict
+    # Build chord weights dict
     chord_weights = {
         "chord_variety": c_chord_variety,
         "chord_type_variety": c_chord_type_variety,
@@ -901,16 +888,10 @@ def generate_music(
 
 
 def create_ui():
-    """Create the Gradio interface with sidebar layout."""
+    """Create the Gradio interface with vertically scrollable sidebar."""
 
+    # Simplified CSS - remove any height/overflow restrictions
     css = """
-    .sidebar {
-        padding: 10px !important;
-        border-radius: 8px !important;
-        max-height: 90vh !important;
-        overflow: scroll !important;
-    }
-    .output-area { min-height: 600px; }
     .reset-btn {
         font-size: 11px !important;
         padding: 4px 8px !important;
@@ -925,7 +906,7 @@ def create_ui():
             # =================================================================
             # LEFT: OUTPUT AREA (main content)
             # =================================================================
-            with gr.Column(scale=3, elem_classes="output-area"):
+            with gr.Column(scale=3):
                 gr.Markdown("## Strudel Player")
 
                 strudel_player = gr.HTML(
@@ -959,7 +940,7 @@ def create_ui():
             # =================================================================
             # RIGHT: SIDEBAR WITH ALL CONTROLS
             # =================================================================
-            with gr.Column(scale=2, elem_classes="sidebar"):
+            with gr.Column(scale=2):
                 gr.Markdown("## Controls")
 
                 # --- General Settings ---
