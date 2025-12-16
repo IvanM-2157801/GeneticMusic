@@ -233,104 +233,147 @@ lofi_bass_rhythm = make_lofi_rhythm_fitness(
 
 
 def dnb_kick_fitness(rhythm: str) -> float:
-    """DnB kick fitness - syncopated, punchy with offbeat bounce."""
+    """DnB kick fitness - SPARSE, strategic placement like Amen break.
+    
+    Amen break: [bd ~ bd ~] ~ [~ ~ bd bd] [bd ~ ~ ~]
+    In our 8-beat encoding:
+    - Beat 0: YES (the anchor)
+    - Beat 1: maybe
+    - Beat 2: NO (snare)
+    - Beat 3: NO (mostly)
+    - Beat 4: maybe
+    - Beat 5: maybe (syncopation)
+    - Beat 6: NO (snare)
+    - Beat 7: NO
+    
+    Total: 3-5 hits maximum (very sparse!)
+    """
     if not rhythm:
         return 0.0
 
     score = 0.0
     length = len(rhythm)
+    if length < 8:
+        return 0.0
 
-    # 1. Must have kick on beat 1 (strong anchor)
+    # Count total hits
+    total_hits = sum(int(c) for c in rhythm)
+    
+    # 1. CRITICAL: Must be SPARSE (3-5 hits total)
+    if total_hits >= 3 and total_hits <= 5:
+        score += 0.3
+    elif total_hits >= 6 and total_hits <= 7:
+        score += 0.1  # Acceptable
+    else:
+        score += 0.0  # Too few or too many
+
+    # 2. MUST have kick on beat 0
     if rhythm[0] != "0":
+        score += 0.3
+
+    # 3. NO kicks on backbeat (2, 6) - that's snare territory
+    if rhythm[2] == "0" and rhythm[6] == "0":
         score += 0.2
+    else:
+        score -= 0.2  # Penalty
 
-    # 2. Reward offbeat kicks (the DnB bounce) - positions 1, 3, 5, 7
-    offbeat_hits = sum(1 for i in [1, 3, 5, 7] if i < length and rhythm[i] != "0")
-    score += 0.25 * (offbeat_hits / min(4, length // 2))
-
-    # 3. Reward syncopation - alternating patterns
-    syncopation = sum(
-        1 for i in range(length - 1) if rhythm[i] != rhythm[i + 1]
-    ) / max(length - 1, 1)
-    score += 0.2 * syncopation
-
-    # 4. Moderate density - not too sparse, not too busy (target ~40-60%)
-    density = sum(int(c) for c in rhythm) / (length * 4.0)
-    density_score = 1.0 - abs(density - 0.35) * 3  # Peak at 35% density
-    score += 0.2 * max(0, density_score)
-
-    # 5. Penalize patterns that are too regular (every beat or every other beat)
-    if rhythm == "1" * length or rhythm == "10" * (length // 2):
-        score -= 0.15
-
-    # 6. Reward some subdivision for that fast DnB feel
-    has_subdivision = any(c in "234" for c in rhythm)
-    if has_subdivision:
-        score += 0.15
+    # 4. Reward kicks on offbeats (1, 5) for syncopation
+    offbeat_score = 0
+    if rhythm[1] != "0":
+        offbeat_score += 0.5
+    if rhythm[5] != "0":
+        offbeat_score += 0.5
+    score += 0.2 * min(offbeat_score, 1.0)
 
     return max(0.0, min(1.0, score))
 
 
 def dnb_snare_fitness(rhythm: str) -> float:
-    """DnB snare fitness - backbeat with ghost notes and rolls."""
+    """DnB snare fitness - SPARSE backbeat only.
+    
+    Amen break snare: ~ [sd ~ ~ sd] [~ sd ~ ~] [~ ~ oh ~]
+    In our 8-beat encoding:
+    - Beat 0: REST (no snare)
+    - Beat 1: maybe 1 hit
+    - Beat 2: SINGLE hit (backbeat) 
+    - Beat 3: maybe 1 hit
+    - Beat 4: REST (no snare)
+    - Beat 5: REST (no snare) 
+    - Beat 6: SINGLE hit (backbeat)
+    - Beat 7: maybe 1 hit
+    
+    Total hits: 2-4 ONLY (very sparse!)
+    """
     if not rhythm:
         return 0.0
 
     score = 0.0
     length = len(rhythm)
+    if length < 8:
+        return 0.0
 
-    # 1. Strong backbeat on beats 3 and 7 (indices 2, 6 in 8-beat)
-    backbeat_positions = [2, 6] if length >= 8 else [1, 3]
-    backbeat_hits = sum(1 for i in backbeat_positions if i < length and rhythm[i] != "0")
-    score += 0.3 * (backbeat_hits / len(backbeat_positions))
+    # Count total hits
+    total_hits = sum(int(c) for c in rhythm)
+    
+    # 1. CRITICAL: Must be SPARSE (only 2-4 hits total)
+    if total_hits >= 2 and total_hits <= 4:
+        score += 0.4
+    elif total_hits >= 5 and total_hits <= 6:
+        score += 0.2  # Acceptable but busier
+    else:
+        score += 0.0  # Too sparse or too busy
 
-    # 2. Reward ghost notes (hits on non-backbeat positions)
-    ghost_positions = [i for i in range(length) if i not in backbeat_positions]
-    ghost_hits = sum(1 for i in ghost_positions if rhythm[i] != "0")
-    ghost_ratio = ghost_hits / max(len(ghost_positions), 1)
-    # Want some ghosts but not too many (target 20-40%)
-    ghost_score = 1.0 - abs(ghost_ratio - 0.3) * 3
-    score += 0.25 * max(0, ghost_score)
+    # 2. MUST have backbeat on 2 and 6
+    backbeat_positions = [2, 6]
+    backbeat_hits = sum(1 for i in backbeat_positions if rhythm[i] != "0")
+    score += 0.4 * (backbeat_hits / 2.0)
 
-    # 3. Reward subdivisions (rolls, fast hits)
-    subdivision_count = sum(1 for c in rhythm if c in "234")
-    subdivision_ratio = subdivision_count / length
-    score += 0.25 * min(subdivision_ratio * 2, 1.0)
+    # 3. Backbeat should be SINGLE hits, not subdivisions
+    if rhythm[2] == "1":
+        score += 0.1
+    if rhythm[6] == "1":
+        score += 0.1
 
-    # 4. Syncopation
-    syncopation = sum(
-        1 for i in range(length - 1) if rhythm[i] != rhythm[i + 1]
-    ) / max(length - 1, 1)
-    score += 0.2 * syncopation
+    # 4. NO snares on beats 0, 4 (those are kick positions)
+    if rhythm[0] == "0" and rhythm[4] == "0":
+        score += 0.0  # Good, no penalty needed
+    else:
+        score -= 0.2  # Penalty
 
     return max(0.0, min(1.0, score))
 
 
 def dnb_hihat_fitness(rhythm: str) -> float:
-    """DnB hihat fitness - fast, driving, dense."""
+    """DnB hihat/ride fitness - consistent driving 8th notes.
+    
+    Amen break ride: [rd ~ rd ~] [rd ~ rd ~] (repeated)
+    In our encoding: all 2s (8th notes) or all 1s
+    Target: "22222222" or "11111111"
+    """
     if not rhythm:
         return 0.0
 
     score = 0.0
     length = len(rhythm)
 
-    # 1. High density - DnB hats are fast (target 70-90%)
-    density = sum(int(c) for c in rhythm) / (length * 4.0)
-    density_score = min(density / 0.8, 1.0)  # Reward high density up to 80%
-    score += 0.35 * density_score
-
-    # 2. Consistency - steady driving pattern
+    # 1. PERFECT CONSISTENCY - same value repeated (critical!)
     unique_vals = len(set(rhythm))
-    consistency_score = 1.0 - (unique_vals - 1) / 4.0  # Fewer unique values = more consistent
-    score += 0.25 * max(0, consistency_score)
+    if unique_vals == 1 and rhythm[0] != "0":  # All same, no rests
+        score += 0.5
+    elif unique_vals == 2 and "0" in rhythm:  # One value + some rests
+        score += 0.2
+    elif unique_vals <= 2:  # Two different subdivisions
+        score += 0.1
 
-    # 3. Prefer subdivisions (2s, 3s, 4s) over single hits
-    subdivision_ratio = sum(1 for c in rhythm if c in "234") / length
-    score += 0.25 * subdivision_ratio
+    # 2. Prefer 8th notes (2s) or constant quarter notes (1s)
+    if rhythm == "2" * length:
+        score += 0.3  # Perfect 8th note groove!
+    elif rhythm == "1" * length:
+        score += 0.2  # Acceptable quarter note groove
 
-    # 4. Penalize too many rests
-    rest_ratio = rhythm.count("0") / length
-    score += 0.15 * (1.0 - rest_ratio)
+    # 3. No rests (driving timekeeping)
+    rest_count = rhythm.count("0")
+    score += 0.2 * (1.0 - rest_count / length)
 
     return max(0.0, min(1.0, score))
 
@@ -417,8 +460,8 @@ def create_lofi_layers():
             name="kick",
             instrument="bd",
             bars=BARS,
-            beats_per_bar=BEATS_PER_BAR * 2,
-            max_subdivision=2,  # Allow 8th notes for syncopated DnB kicks
+            beats_per_bar=BEATS_PER_BAR,  # 4 beats per bar = 8 total beats
+            max_subdivision=2,  # Allow pairs and syncopation
             is_drum=True,
             drum_sound="bd",
             rhythm_fitness_fn=kick,
@@ -435,8 +478,8 @@ def create_lofi_layers():
             name="snare",
             instrument="sd",
             bars=BARS,
-            beats_per_bar=BEATS_PER_BAR * 2,
-            max_subdivision=3,  # Allow triplets for ghost notes and rolls
+            beats_per_bar=BEATS_PER_BAR,  # 4 beats per bar = 8 total beats
+            max_subdivision=2,  # Only allow pairs, no triplets
             is_drum=True,
             drum_sound="sd",
             rhythm_fitness_fn=snare,
@@ -454,8 +497,8 @@ def create_lofi_layers():
             name="hihat",
             instrument="hh",
             bars=BARS,
-            beats_per_bar=BEATS_PER_BAR * 2,
-            max_subdivision=4,  # Allow 16th notes for fast DnB hats
+            beats_per_bar=BEATS_PER_BAR,  # 4 beats per bar = 8 total beats
+            max_subdivision=2,  # 8th notes for driving pattern
             is_drum=True,
             drum_sound="hh",
             rhythm_fitness_fn=hihat,
