@@ -141,6 +141,7 @@ class Phrase:
         drum_sound: str = None,
         chord_mode: bool = False,
         base_octave: int = 4,
+        scale_root: NoteName = None,
     ) -> str:
         """Convert phrase to Strudel notation preserving rhythm structure.
 
@@ -155,6 +156,8 @@ class Phrase:
             base_octave: Base octave for scale degree calculation (default 4).
                          Notes above this octave add +7 per octave to the degree,
                          notes below subtract -7 per octave.
+            scale_root: Root note of the scale (e.g., NoteName.E for E minor).
+                        If provided, degrees are calculated relative to this root.
         """
         beat_groups = []
         note_idx = 0
@@ -175,11 +178,37 @@ class Phrase:
                         if note_idx < len(self.notes):
                             note = self.notes[note_idx]
                             if scale_degrees:
-                                # Use scale degree (0-7) based on pitch value
+                                # Use scale degree (0-6) based on pitch value
                                 if note.pitch == NoteName.REST:
                                     beat_notes.append("~")
                                 else:
-                                    degree = note.pitch.value % 7
+                                    # Calculate degree relative to scale root
+                                    if scale_root is not None:
+                                        # Get semitone distance from root, then convert to scale degree
+                                        root_semitone = scale_root.value
+                                        note_semitone = note.pitch.value
+                                        # Get semitone distance (0-11)
+                                        semitone_dist = (note_semitone - root_semitone) % 12
+                                        # Map semitones to scale degrees for a 7-note scale
+                                        # This assumes a diatonic scale pattern
+                                        semitone_to_degree = {
+                                            0: 0,   # Root
+                                            1: 0,   # Minor 2nd -> round to root
+                                            2: 1,   # Major 2nd
+                                            3: 2,   # Minor 3rd
+                                            4: 2,   # Major 3rd -> round to 2
+                                            5: 3,   # Perfect 4th
+                                            6: 3,   # Tritone -> round to 3
+                                            7: 4,   # Perfect 5th
+                                            8: 5,   # Minor 6th
+                                            9: 5,   # Major 6th -> round to 5
+                                            10: 6,  # Minor 7th
+                                            11: 6,  # Major 7th -> round to 6
+                                        }
+                                        degree = semitone_to_degree.get(semitone_dist, 0)
+                                    else:
+                                        # Legacy behavior: use pitch value mod 7
+                                        degree = note.pitch.value % 7
                                     # Add octave offset: +7 per octave above base, -7 per octave below
                                     octave_offset = (note.octave - base_octave) * 7
                                     final_degree = degree + octave_offset
@@ -244,6 +273,28 @@ class Layer:
     context_group: str = ""
     # Sound bank for Strudel (e.g., "RolandTR808", "alesissr16")
     bank: str = ""
+    # New metal-style output options
+    use_note_notation: bool = False  # If True, uses note("e2") instead of n("0").scale()
+    struct_pattern: str = ""  # Optional struct pattern (e.g., "x*8", "x(7,16)")
+    slow_factor: float = 1.0  # Slow down factor (e.g., 2.0 for .slow(2))
+    adsr: str = ""  # ADSR envelope string (e.g., ".001:.1:.8:.05")
+    lpq: float = 0.0  # Low-pass filter Q/resonance (0 = disabled)
+
+    def _get_scale_root(self) -> NoteName:
+        """Get the root note of the scale from the scale string (e.g., 'e:minor' -> NoteName.E)."""
+        if not self.scale:
+            return NoteName.C
+        
+        root_str = self.scale.split(":")[0].lower()
+        root_map = {
+            "c": NoteName.C, "cs": NoteName.CS, "db": NoteName.CS,
+            "d": NoteName.D, "ds": NoteName.DS, "eb": NoteName.DS,
+            "e": NoteName.E, "f": NoteName.F, "fs": NoteName.FS,
+            "gb": NoteName.FS, "g": NoteName.G, "gs": NoteName.GS,
+            "ab": NoteName.GS, "a": NoteName.A, "as": NoteName.AS,
+            "bb": NoteName.AS, "b": NoteName.B,
+        }
+        return root_map.get(root_str, NoteName.C)
 
     def _build_effects_chain(self) -> str:
         """Build the effects chain for Strudel output."""
@@ -255,18 +306,23 @@ class Layer:
         # Filters
         if self.lpf:
             effects.append(f".lpf({self.lpf})")
+        if self.lpq > 0:
+            effects.append(f".lpq({self.lpq})")
         if self.hpf:
             effects.append(f".hpf({self.hpf})")
 
-        # Envelope (ADSR)
-        if self.attack > 0:
-            effects.append(f".attack({self.attack})")
-        if self.decay > 0:
-            effects.append(f".decay({self.decay})")
-        if self.sustain > 0:
-            effects.append(f".sustain({self.sustain})")
-        if self.release > 0:
-            effects.append(f".release({self.release})")
+        # Envelope (ADSR) - use adsr string if provided, otherwise individual params
+        if self.adsr:
+            effects.append(f'.adsr("{self.adsr}")')
+        else:
+            if self.attack > 0:
+                effects.append(f".attack({self.attack})")
+            if self.decay > 0:
+                effects.append(f".decay({self.decay})")
+            if self.sustain > 0:
+                effects.append(f".sustain({self.sustain})")
+            if self.release > 0:
+                effects.append(f".release({self.release})")
 
         # Distortion
         if self.distort > 0:
@@ -300,8 +356,13 @@ class Layer:
         Otherwise, falls back to simple grouping.
         """
         if self.is_drum:
-            # Drum layer: use sound() with rhythm structure
-            if self.rhythm:
+            # Drum layer: use sound() or s()
+            if self.struct_pattern:
+                # When struct pattern is set, just use the drum sound directly
+                # The struct pattern handles the rhythm
+                result = f's("{self.drum_sound}")'
+                result += f'.struct("{self.struct_pattern}")'
+            elif self.rhythm:
                 # Convert rhythm to sound pattern
                 beat_groups = []
                 for beat_char in self.rhythm:
@@ -315,12 +376,11 @@ class Layer:
                             "[" + " ".join([self.drum_sound] * subdivisions) + "]"
                         )
                 pattern = " ".join(beat_groups)
+                result = f'sound("{pattern}")'
             else:
                 # Fallback for drums without rhythm
-                pattern = self.drum_sound
+                result = f's("{self.drum_sound}")'
 
-            # Build drum expression
-            result = f'sound("{pattern}")'
             result += self._build_effects_chain()
             # Add bank if specified
             if self.bank:
@@ -328,18 +388,28 @@ class Layer:
             return result
 
         elif self.is_chord_layer and self.chord_progression:
-            # Chord layer: output chords as comma-separated scale degrees
-            pattern = self._chord_progression_to_strudel()
-
-            # Build Strudel expression with .sub() applied to the pattern string
-            if self.octave_shift != 0:
-                result = f'n("{pattern}".sub({abs(self.octave_shift)}))'
+            # Chord layer: output chords
+            if self.use_note_notation:
+                # Use note() with absolute pitch chord voicings
+                pattern = self._chord_progression_to_note_notation()
+                result = f'note("{pattern}")'
+                result += f'.s("{self.instrument}")'
             else:
-                result = f'n("{pattern}")'
+                # Use n() with scale degrees
+                pattern = self._chord_progression_to_strudel()
+                if self.octave_shift != 0:
+                    result = f'n("{pattern}".sub({abs(self.octave_shift)}))'
+                else:
+                    result = f'n("{pattern}")'
+                result += f'.scale("{self.scale}")'
+                result += f'.s("{self.instrument}")'
 
-            # Add scale and instrument
-            result += f'.scale("{self.scale}")'
-            result += f'.s("{self.instrument}")'
+            # Add struct pattern if specified
+            if self.struct_pattern:
+                result += f'.struct("{self.struct_pattern}")'
+            # Add slow factor if specified
+            if self.slow_factor > 1.0:
+                result += f'.slow({self.slow_factor})'
             result += self._build_effects_chain()
             # Add bank if specified
             if self.bank:
@@ -347,32 +417,63 @@ class Layer:
             return result
 
         else:
-            # Melodic layer: use n() with scale/effects
-            if self.rhythm and self.phrases:
-                # Use rhythm-aware formatting for each phrase
-                patterns = [
-                    p.to_strudel_with_rhythm(
-                        self.rhythm,
-                        self.use_scale_degrees,
-                        chord_mode=self.chord_mode,
-                        base_octave=self.base_octave,
-                    )
-                    for p in self.phrases
-                ]
-                pattern = " ".join(patterns)
+            # Melodic layer
+            if self.use_note_notation:
+                # Use note("e2 g2 ...") with absolute pitches
+                if self.phrases:
+                    # Get all notes as absolute pitches
+                    all_notes = []
+                    for p in self.phrases:
+                        for note in p.notes:
+                            all_notes.append(note.to_strudel())
+                    pattern = " ".join(all_notes)
+                else:
+                    pattern = "~"
+                
+                result = f'note("<{pattern}>")'
+                result += f'.s("{self.instrument}")'
+                # Add struct pattern if specified
+                if self.struct_pattern:
+                    result += f'.struct("{self.struct_pattern}")'
+                # Add slow factor if specified
+                if self.slow_factor > 1.0:
+                    result += f'.slow({self.slow_factor})'
             else:
-                # Fallback: simple grouping
-                pattern = " ".join(f"[{p.to_strudel()}]" for p in self.phrases)
+                # Use n() with scale degrees (original behavior)
+                if self.rhythm and self.phrases:
+                    # Use rhythm-aware formatting for each phrase
+                    scale_root = self._get_scale_root() if self.use_scale_degrees else None
+                    patterns = [
+                        p.to_strudel_with_rhythm(
+                            self.rhythm,
+                            self.use_scale_degrees,
+                            chord_mode=self.chord_mode,
+                            base_octave=self.base_octave,
+                            scale_root=scale_root,
+                        )
+                        for p in self.phrases
+                    ]
+                    pattern = " ".join(patterns)
+                else:
+                    # Fallback: simple grouping
+                    pattern = " ".join(f"[{p.to_strudel()}]" for p in self.phrases)
 
-            # Build Strudel expression with .sub() applied to the pattern string
-            if self.octave_shift != 0:
-                result = f'n("{pattern}".sub({abs(self.octave_shift)}))'
-            else:
-                result = f'n("{pattern}")'
+                # Build Strudel expression with .sub() applied to the pattern string
+                if self.octave_shift != 0:
+                    result = f'n("{pattern}".sub({abs(self.octave_shift)}))'
+                else:
+                    result = f'n("{pattern}")'
 
-            # Add scale and instrument
-            result += f'.scale("{self.scale}")'
-            result += f'.s("{self.instrument}")'
+                # Add scale and instrument
+                result += f'.scale("{self.scale}")'
+                result += f'.s("{self.instrument}")'
+                # Add struct pattern if specified
+                if self.struct_pattern:
+                    result += f'.struct("{self.struct_pattern}")'
+                # Add slow factor if specified
+                if self.slow_factor > 1.0:
+                    result += f'.slow({self.slow_factor})'
+
             result += self._build_effects_chain()
             # Add bank if specified
             if self.bank:
@@ -410,6 +511,75 @@ class Layer:
                 chord_strs.append("[" + ", ".join(degrees) + "]")
 
         return " ".join(chord_strs)
+
+    def _chord_progression_to_note_notation(self) -> str:
+        """Convert chord progression to note() notation with absolute pitches.
+
+        Creates proper power chord voicings like "[e3,b3,e4]" matching metal_song.js style.
+        This produces real note names with octaves instead of scale degrees.
+        
+        Example output: "[e3,b3,e4] [c3,g3,c4] [d3,a3,d4] [a2,e3,a3]"
+        """
+        if not self.chord_progression:
+            return "e3"
+
+        # Parse scale to get notes
+        root_str = self.scale.split(":")[0].lower() if self.scale else "c"
+        mode = self.scale.split(":")[1].lower() if ":" in self.scale else "major"
+        
+        # Get scale notes
+        scale_intervals = SCALE_INTERVALS.get(mode, SCALE_INTERVALS["major"])
+        root_semitone = NOTE_NAME_TO_SEMITONE.get(root_str, 0)
+        
+        # Build scale notes as semitones from C
+        scale_notes = [(root_semitone + interval) % 12 for interval in scale_intervals]
+        
+        # Map semitones to note names
+        semitone_to_name = {
+            0: "c", 1: "cs", 2: "d", 3: "ds", 4: "e", 5: "f",
+            6: "fs", 7: "g", 8: "gs", 9: "a", 10: "as", 11: "b"
+        }
+        
+        chord_strs = []
+        base_octave = self.base_octave
+        
+        for chord in self.chord_progression:
+            root_degree = chord.root_degree % len(scale_notes)
+            num_notes = len(chord.intervals)
+            
+            # Get root note semitone
+            root_note = scale_notes[root_degree]
+            
+            # Build power chord voicing: root, 5th, octave (or 3rd for variety)
+            notes = []
+            for i in range(num_notes):
+                if i == 0:
+                    # Root note
+                    note_semitone = root_note
+                    octave = base_octave
+                elif i == 1:
+                    # 5th (7 semitones up) or 3rd (3-4 semitones)
+                    note_semitone = (root_note + 7) % 12  # Perfect 5th
+                    octave = base_octave if root_note + 7 < 12 else base_octave
+                elif i == 2:
+                    # Octave (root + 12)
+                    note_semitone = root_note
+                    octave = base_octave + 1
+                else:
+                    # Higher extensions
+                    note_semitone = (root_note + (i * 5)) % 12  # Stack 5ths
+                    octave = base_octave + (i // 2)
+                
+                note_name = semitone_to_name[note_semitone]
+                notes.append(f"{note_name}{octave}")
+            
+            if len(notes) == 1:
+                chord_strs.append(notes[0])
+            else:
+                chord_strs.append("[" + ",".join(notes) + "]")
+
+        # Wrap in angle brackets for alternation (makes struct patterns work properly)
+        return "<" + " ".join(chord_strs) + ">"
 
 
 @dataclass
@@ -844,7 +1014,9 @@ class SongStructure:
 
     def to_strudel(self) -> str:
         """Generate complete Strudel code with named constants."""
-        lines = [f"setcpm({self.bpm / 4})", ""]
+        # In Strudel, cpm = cycles per minute. For metal at 140 BPM,
+        # we use cpm(140) directly (1 cycle = 1 beat in reference)
+        lines = [f"setcpm({self.bpm})", ""]
 
         # Output layer constants
         if self.layers:
@@ -887,7 +1059,9 @@ class Composition:
     )
 
     def to_strudel(self) -> str:
-        lines = [f"setcpm({self.bpm / 4})", ""]  # cpm = cycles per minute
+        # In Strudel, cpm = cycles per minute. For metal at 140 BPM,
+        # we use cpm(140) directly (1 cycle = 1 beat in reference)
+        lines = [f"setcpm({self.bpm})", ""]
         lines.extend(f"$: {layer.to_strudel()}" for layer in self.layers)
         return "\n".join(lines)
 

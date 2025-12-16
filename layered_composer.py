@@ -105,6 +105,12 @@ class LayerConfig:
     # Contextual fitness weights for inter-layer scoring
     # Available metrics: "rhythmic", "density", "harmonic", "voice_leading", "call_response"
     contextual_weights: dict = None  # e.g., {"rhythmic": 0.4, "harmonic": 0.3}
+    # Metal-style output options
+    use_note_notation: bool = False  # If True, uses note("e2") instead of n("0").scale()
+    struct_pattern: str = ""  # Optional struct pattern (e.g., "x*8", "x(7,16)")
+    slow_factor: float = 1.0  # Slow down factor (e.g., 2.0 for .slow(2))
+    adsr: str = ""  # ADSR envelope string (e.g., ".001:.1:.8:.05")
+    lpq: float = 0.0  # Low-pass filter Q/resonance (0 = disabled)
 
     def __post_init__(self):
         if self.scale is None:
@@ -593,6 +599,7 @@ class LayeredComposer:
                         layer_role=config.layer_role,
                         context_group=config.context_group,
                         bank=config.bank,
+                        struct_pattern=config.struct_pattern,
                     )
                     layers.append(layer)
 
@@ -634,6 +641,11 @@ class LayeredComposer:
                         layer_role=config.layer_role,
                         context_group=config.context_group,
                         bank=config.bank,
+                        use_note_notation=config.use_note_notation,
+                        struct_pattern=config.struct_pattern,
+                        slow_factor=config.slow_factor,
+                        adsr=config.adsr,
+                        lpq=config.lpq,
                     )
                     layers.append(layer)
 
@@ -676,6 +688,11 @@ class LayeredComposer:
                         layer_role=config.layer_role,
                         context_group=config.context_group,
                         bank=config.bank,
+                        use_note_notation=config.use_note_notation,
+                        struct_pattern=config.struct_pattern,
+                        slow_factor=config.slow_factor,
+                        adsr=config.adsr,
+                        lpq=config.lpq,
                     )
                     layers.append(layer)
 
@@ -738,6 +755,7 @@ class LayeredComposer:
                         layer_role=config.layer_role,
                         context_group=config.context_group,
                         bank=config.bank,
+                        struct_pattern=config.struct_pattern,
                     )
                     layers_by_name[config.name] = layer
 
@@ -771,6 +789,11 @@ class LayeredComposer:
                         layer_role=config.layer_role,
                         context_group=config.context_group,
                         bank=config.bank,
+                        use_note_notation=config.use_note_notation,
+                        struct_pattern=config.struct_pattern,
+                        slow_factor=config.slow_factor,
+                        adsr=config.adsr,
+                        lpq=config.lpq,
                     )
                     layers_by_name[config.name] = layer
 
@@ -805,6 +828,11 @@ class LayeredComposer:
                         layer_role=config.layer_role,
                         context_group=config.context_group,
                         bank=config.bank,
+                        use_note_notation=config.use_note_notation,
+                        struct_pattern=config.struct_pattern,
+                        slow_factor=config.slow_factor,
+                        adsr=config.adsr,
+                        lpq=config.lpq,
                     )
                     layers_by_name[config.name] = layer
 
