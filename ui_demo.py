@@ -189,6 +189,7 @@ def generate_python_preset(
     max_subdivision,
     population_size,
     generations,
+    fitness_threshold,
     instrument,
     scale_name,
     drum_sound,
@@ -280,6 +281,7 @@ MODE = "{mode}"  # "Melody", "Chord", or "Drum"
 DRUM_SOUND = "{drum_sound}"  # Used in Drum mode
 NUM_CHORDS = {num_chords}  # Number of chords (Chord mode)
 NOTES_PER_CHORD = {notes_per_chord}  # Notes per chord (Chord mode)
+FITNESS_THRESHOLD = {fitness_threshold}  # Early stop threshold (0 = disabled)
 
 
 # =============================================================================
@@ -467,6 +469,7 @@ def main():
         population_size=POPULATION_SIZE, mutation_rate=0.25,
         elitism_count=max(2, POPULATION_SIZE // 5),
         rhythm_generations=GENERATIONS, melody_generations=GENERATIONS,
+        fitness_threshold=FITNESS_THRESHOLD,
     )
 
     if MODE == "Drum":
@@ -571,6 +574,7 @@ def generate_music(
     max_subdivision,
     population_size,
     generations,
+    fitness_threshold,
     instrument,
     scale_name,
     drum_sound,
@@ -678,6 +682,7 @@ def generate_music(
         elitism_count=max(2, int(population_size) // 5),
         rhythm_generations=int(generations),
         melody_generations=int(generations),
+        fitness_threshold=float(fitness_threshold),
     )
 
     # Add layer based on mode
@@ -817,6 +822,41 @@ def generate_music(
 | Simplicity | {simplicity(rhythm):.2f} |
 """
 
+    # Add final fitness scores
+    fitness_data = composer.final_fitness.get(layer_name, {})
+    if fitness_data:
+        summary += f"""
+---
+### Final Fitness Scores
+
+| Phase | Fitness | Generations |
+|-------|---------|-------------|
+"""
+        if "rhythm" in fitness_data:
+            r_fit = fitness_data.get("rhythm", 0)
+            r_gen = fitness_data.get("rhythm_gen", 0)
+            summary += f"| Rhythm | **{r_fit:.4f}** | {r_gen}/{int(generations)} |\n"
+        if "melody" in fitness_data:
+            m_fit = fitness_data.get("melody", 0)
+            m_gen = fitness_data.get("melody_gen", 0)
+            summary += f"| Melody | **{m_fit:.4f}** | {m_gen}/{int(generations)} |\n"
+        if "chord" in fitness_data:
+            c_fit = fitness_data.get("chord", 0)
+            c_gen = fitness_data.get("chord_gen", 0)
+            summary += f"| Chord | **{c_fit:.4f}** | {c_gen}/{int(generations)} |\n"
+
+        # Show if early stopping was triggered
+        if fitness_threshold > 0:
+            any_early = any(
+                fitness_data.get(f"{phase}_gen", int(generations)) < int(generations)
+                for phase in ["rhythm", "melody", "chord"]
+                if f"{phase}_gen" in fitness_data
+            )
+            if any_early:
+                summary += (
+                    f"\n*Early stopping triggered (threshold: {fitness_threshold:.2f})*"
+                )
+
     # Also generate Python preset
     python_preset = generate_python_preset(
         mode,
@@ -826,6 +866,7 @@ def generate_music(
         max_subdivision,
         population_size,
         generations,
+        fitness_threshold,
         instrument,
         scale_name,
         drum_sound,
@@ -988,7 +1029,7 @@ def create_ui():
                     with gr.Row():
                         population_size = gr.Slider(
                             10,
-                            100,
+                            10000,
                             value=20,
                             step=5,
                             label="Population",
@@ -996,11 +1037,20 @@ def create_ui():
                         )
                         generations = gr.Slider(
                             10,
-                            100,
+                            10000,
                             value=20,
                             step=5,
                             label="Generations",
                             info="Evolution iterations per phase",
+                        )
+                    with gr.Row():
+                        fitness_threshold = gr.Slider(
+                            0,
+                            1,
+                            value=0,
+                            step=0.05,
+                            label="Early Stop Threshold",
+                            info="Stop when fitness >= this (0=disabled)",
                         )
                     with gr.Row():
                         instrument = gr.Dropdown(
@@ -1447,6 +1497,7 @@ def create_ui():
             max_subdivision,
             population_size,
             generations,
+            fitness_threshold,
             instrument,
             scale_name,
             drum_sound,
