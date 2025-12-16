@@ -49,6 +49,7 @@ from fitness.chords import (
 from fitness.contextual import get_context_groups
 from core.genome_ops import ChordProgression
 from layered_composer import LayeredComposer, LayerConfig
+from fitness_visualizer import FitnessVisualizer
 
 
 # =============================================================================
@@ -445,7 +446,10 @@ def main():
     print(f"Bars: {BARS}, Beats/bar: {BEATS_PER_BAR}")
     print()
 
-    # Create composer
+    # Create visualizer
+    viz = FitnessVisualizer(track_diversity=True)
+
+    # Create composer with visualizer
     composer = LayeredComposer(
         population_size=POPULATION_SIZE,
         mutation_rate=MUTATION_RATE,
@@ -454,6 +458,9 @@ def main():
         melody_generations=MELODY_GENERATIONS,
         chord_generations=CHORD_GENERATIONS,
     )
+    
+    # Attach visualizer to composer (we'll track manually)
+    composer.visualizer = viz
 
     # Add layers
     layers = create_lofi_layers()
@@ -530,6 +537,54 @@ def main():
     print()
     print("Add this line to your Strudel code for vinyl texture:")
     print('$: sound("crow").gain(0.05).lpf(3000)')
+    print()
+    
+    # ==========================================================================
+    # VISUALIZATIONS
+    # ==========================================================================
+    print("=" * 60)
+    print(" EVOLUTION ANALYSIS")
+    print("=" * 60)
+    print()
+    
+    # Print summaries for each layer
+    for layer_name in viz.history.keys():
+        viz.print_summary(layer_name)
+    
+    # Plot evolution curves for all layers
+    print("Generating visualization plots...")
+    import os
+    os.makedirs("outputs", exist_ok=True)
+    
+    # Dashboard for each layer
+    for layer_name in viz.history.keys():
+        save_path = f"outputs/{layer_name}_dashboard.png"
+        viz.plot_all_metrics_dashboard(layer_name, save_path=save_path)
+    
+    # Multi-layer comparison
+    melody_layers = [name for name in viz.history.keys() if "melody" in name]
+    if melody_layers:
+        viz.plot_multi_layer_comparison(
+            melody_layers,
+            metric="best_fitness",
+            save_path="outputs/melody_comparison.png"
+        )
+    
+    rhythm_layers = [name for name in viz.history.keys() if "rhythm" in name]
+    if rhythm_layers:
+        viz.plot_multi_layer_comparison(
+            rhythm_layers,
+            metric="best_fitness",
+            save_path="outputs/rhythm_comparison.png"
+        )
+    
+    # Rhythm heatmaps for ALL rhythm layers (drums AND chords)
+    rhythm_layers_for_heatmap = [name for name in viz.history.keys() if "rhythm" in name]
+    for layer_name in rhythm_layers_for_heatmap:
+        save_path = f"outputs/{layer_name}_heatmap.png"
+        viz.plot_rhythm_heatmap(layer_name, num_snapshots=10, save_path=save_path)
+    
+    print(f"\n✓ Saved {len(viz.history)} evolution visualizations to outputs/")
     print()
 
 

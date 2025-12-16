@@ -189,6 +189,9 @@ class LayeredComposer:
         # Scale info (set before evolution)
         self.scale_root: str = "c"
         self.scale_type: str = "major"
+        
+        # Optional visualizer for tracking evolution
+        self.visualizer = None
 
     def add_layer(self, config: LayerConfig) -> None:
         """Add a layer configuration."""
@@ -237,6 +240,14 @@ class LayeredComposer:
 
             best = population[0]
             best_fitness = best.fitness
+            
+            # Track in visualizer if available
+            if self.visualizer:
+                self.visualizer.record_generation(
+                    population,
+                    generation=gen,
+                    layer_name=f"{config.name}_rhythm"
+                )
 
             if verbose and (gen % 5 == 0 or gen == self.rhythm_generations - 1):
                 print(
@@ -340,6 +351,14 @@ class LayeredComposer:
 
             best = population[0]
             best_fitness = best.fitness
+            
+            # Track in visualizer if available
+            if self.visualizer:
+                self.visualizer.record_generation(
+                    population,
+                    generation=gen,
+                    layer_name=f"{config.name}_melody"
+                )
 
             if verbose and (gen % 10 == 0 or gen == self.melody_generations - 1):
                 print(f"  Gen {gen:3d}: Best fitness = {best_fitness:.4f}")
@@ -423,6 +442,14 @@ class LayeredComposer:
 
             best = population[0]
             best_fitness = best.fitness
+            
+            # Track in visualizer if available
+            if self.visualizer:
+                self.visualizer.record_generation(
+                    population,
+                    generation=gen,
+                    layer_name=f"{config.name}_chords"
+                )
 
             if verbose and (gen % 5 == 0 or gen == self.chord_generations - 1):
                 chord_summary = " → ".join(
