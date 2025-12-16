@@ -408,6 +408,7 @@ class LayeredComposer:
                 prog,
                 mutation_rate=self.mutation_rate,
                 notes_per_chord=config.notes_per_chord,
+                allowed_types=config.allowed_chord_types,
             )
 
         # Evolve

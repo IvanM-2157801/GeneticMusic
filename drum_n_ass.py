@@ -227,44 +227,129 @@ lofi_bass_rhythm = make_lofi_rhythm_fitness(
     }
 )
 
-# Kick: boom-bap style, emphasis on 1, some variation
-lofi_kick = make_lofi_drum_fitness(
-    {
-        "strong_beat": 0.4,
-        "sparse": 0.2,
-        "simple": 0.2,
-        "offbeat": 0.2,  # Some offbeat kicks for that lofi feel
-    }
-)
+# =============================================================================
+# DnB-SPECIFIC FITNESS FUNCTIONS
+# =============================================================================
 
-# Snare: backbeat with ghost notes
-lofi_snare = make_lofi_drum_fitness(
-    {
-        "backbeat": 0.5,
-        "sparse": 0.2,
-        "simple": 0.3,
-    }
-)
 
-# Hihat: busy but not overwhelming, offbeat emphasis
-lofi_hihat = make_lofi_drum_fitness(
-    {
-        "density": 0.3,
-        "offbeat": 0.4,  # Offbeat hats are classic lofi
-        "consistency": 0.2,
-    }
-)
+def dnb_kick_fitness(rhythm: str) -> float:
+    """DnB kick fitness - syncopated, punchy with offbeat bounce."""
+    if not rhythm:
+        return 0.0
+
+    score = 0.0
+    length = len(rhythm)
+
+    # 1. Must have kick on beat 1 (strong anchor)
+    if rhythm[0] != "0":
+        score += 0.2
+
+    # 2. Reward offbeat kicks (the DnB bounce) - positions 1, 3, 5, 7
+    offbeat_hits = sum(1 for i in [1, 3, 5, 7] if i < length and rhythm[i] != "0")
+    score += 0.25 * (offbeat_hits / min(4, length // 2))
+
+    # 3. Reward syncopation - alternating patterns
+    syncopation = sum(
+        1 for i in range(length - 1) if rhythm[i] != rhythm[i + 1]
+    ) / max(length - 1, 1)
+    score += 0.2 * syncopation
+
+    # 4. Moderate density - not too sparse, not too busy (target ~40-60%)
+    density = sum(int(c) for c in rhythm) / (length * 4.0)
+    density_score = 1.0 - abs(density - 0.35) * 3  # Peak at 35% density
+    score += 0.2 * max(0, density_score)
+
+    # 5. Penalize patterns that are too regular (every beat or every other beat)
+    if rhythm == "1" * length or rhythm == "10" * (length // 2):
+        score -= 0.15
+
+    # 6. Reward some subdivision for that fast DnB feel
+    has_subdivision = any(c in "234" for c in rhythm)
+    if has_subdivision:
+        score += 0.15
+
+    return max(0.0, min(1.0, score))
+
+
+def dnb_snare_fitness(rhythm: str) -> float:
+    """DnB snare fitness - backbeat with ghost notes and rolls."""
+    if not rhythm:
+        return 0.0
+
+    score = 0.0
+    length = len(rhythm)
+
+    # 1. Strong backbeat on beats 3 and 7 (indices 2, 6 in 8-beat)
+    backbeat_positions = [2, 6] if length >= 8 else [1, 3]
+    backbeat_hits = sum(1 for i in backbeat_positions if i < length and rhythm[i] != "0")
+    score += 0.3 * (backbeat_hits / len(backbeat_positions))
+
+    # 2. Reward ghost notes (hits on non-backbeat positions)
+    ghost_positions = [i for i in range(length) if i not in backbeat_positions]
+    ghost_hits = sum(1 for i in ghost_positions if rhythm[i] != "0")
+    ghost_ratio = ghost_hits / max(len(ghost_positions), 1)
+    # Want some ghosts but not too many (target 20-40%)
+    ghost_score = 1.0 - abs(ghost_ratio - 0.3) * 3
+    score += 0.25 * max(0, ghost_score)
+
+    # 3. Reward subdivisions (rolls, fast hits)
+    subdivision_count = sum(1 for c in rhythm if c in "234")
+    subdivision_ratio = subdivision_count / length
+    score += 0.25 * min(subdivision_ratio * 2, 1.0)
+
+    # 4. Syncopation
+    syncopation = sum(
+        1 for i in range(length - 1) if rhythm[i] != rhythm[i + 1]
+    ) / max(length - 1, 1)
+    score += 0.2 * syncopation
+
+    return max(0.0, min(1.0, score))
+
+
+def dnb_hihat_fitness(rhythm: str) -> float:
+    """DnB hihat fitness - fast, driving, dense."""
+    if not rhythm:
+        return 0.0
+
+    score = 0.0
+    length = len(rhythm)
+
+    # 1. High density - DnB hats are fast (target 70-90%)
+    density = sum(int(c) for c in rhythm) / (length * 4.0)
+    density_score = min(density / 0.8, 1.0)  # Reward high density up to 80%
+    score += 0.35 * density_score
+
+    # 2. Consistency - steady driving pattern
+    unique_vals = len(set(rhythm))
+    consistency_score = 1.0 - (unique_vals - 1) / 4.0  # Fewer unique values = more consistent
+    score += 0.25 * max(0, consistency_score)
+
+    # 3. Prefer subdivisions (2s, 3s, 4s) over single hits
+    subdivision_ratio = sum(1 for c in rhythm if c in "234") / length
+    score += 0.25 * subdivision_ratio
+
+    # 4. Penalize too many rests
+    rest_ratio = rhythm.count("0") / length
+    score += 0.15 * (1.0 - rest_ratio)
+
+    return max(0.0, min(1.0, score))
+
+
+# Use the new DnB-specific fitness functions
+kick = dnb_kick_fitness
+snare = dnb_snare_fitness
+hihat = dnb_hihat_fitness
 
 
 # =============================================================================
 # EVOLUTION PARAMETERS
 # =============================================================================
 
-BPM = 24  # Very slow, chill tempo (setcpm(6) = 24 BPM)
+BPM = 160  # Very slow, chill tempo (setcpm(6) = 24 BPM)
 BARS = 2
 BEATS_PER_BAR = 4
 
-POPULATION_SIZE = 25
+POPULATION_SIZE = 100
 MUTATION_RATE = 0.2
 ELITISM_COUNT = 5
 RHYTHM_GENERATIONS = 30
@@ -281,56 +366,10 @@ def create_lofi_layers():
     """Create lofi layer configurations."""
     layers = []
 
-    # Jazzy chord pad - piano for that classic lofi feel
-    layers.append(
-        LayerConfig(
-            name="chords",
-            instrument="piano",  # Warm piano chords
-            bars=BARS,
-            beats_per_bar=BEATS_PER_BAR,
-            is_chord_layer=True,
-            num_chords=4,
-            notes_per_chord=4,  # 7th chords
-            allowed_chord_types=["major7", "minor7", "dom7"],
-            chord_fitness_fn=lofi_chords,
-            layer_role="chords",
-            context_group="",
-            gain=0.15,
-            lpf=2000,  # Warm, filtered sound
-            room=0.4,
-            attack=0.05,
-            release=0.4,
-        )
-    )
-
     # Main melody A - nylon guitar for that cozy lofi vibe
     layers.append(
         LayerConfig(
             name="melody_a",
-            instrument="acoustic_guitar_nylon",
-            bars=BARS,
-            beats_per_bar=BEATS_PER_BAR * 2,  # 8 beats for melody
-            max_subdivision=2,
-            octave_range=(4, 5),
-            base_octave=4,
-            rhythm_fitness_fn=lofi_rhythm,
-            melody_fitness_fn=lofi_melody,
-            layer_role="melody",
-            context_group="main",
-            gain=0.4,
-            lpf=3000,
-            room=0.5,
-            delay=0.3,
-            delaytime=0.375,  # Dotted eighth delay
-            delayfeedback=0.4,
-            bank="gm",  # General MIDI bank for guitar
-        )
-    )
-
-    # Main melody B - different evolved melody with same fitness
-    layers.append(
-        LayerConfig(
-            name="melody_b",
             instrument="acoustic_guitar_nylon",
             bars=BARS,
             beats_per_bar=BEATS_PER_BAR * 2,  # 8 beats for melody
@@ -379,15 +418,15 @@ def create_lofi_layers():
             instrument="bd",
             bars=BARS,
             beats_per_bar=BEATS_PER_BAR * 2,
-            max_subdivision=1,
+            max_subdivision=2,  # Allow 8th notes for syncopated DnB kicks
             is_drum=True,
             drum_sound="bd",
-            rhythm_fitness_fn=lofi_kick,
+            rhythm_fitness_fn=kick,
             layer_role="drums",
             context_group="",
             gain=0.3,
             lpf=2000,  # Warm kick
-            bank="RolandTR808",
+            bank="korgddm110",
         )
     )
 
@@ -397,16 +436,16 @@ def create_lofi_layers():
             instrument="sd",
             bars=BARS,
             beats_per_bar=BEATS_PER_BAR * 2,
-            max_subdivision=1,
+            max_subdivision=3,  # Allow triplets for ghost notes and rolls
             is_drum=True,
             drum_sound="sd",
-            rhythm_fitness_fn=lofi_snare,
+            rhythm_fitness_fn=snare,
             layer_role="drums",
             context_group="",
             gain=0.5,
             lpf=4000,
             room=0.15,  # Bit of room on snare
-            bank="RolandTR808",
+            bank="korgddm110",
         )
     )
 
@@ -416,15 +455,15 @@ def create_lofi_layers():
             instrument="hh",
             bars=BARS,
             beats_per_bar=BEATS_PER_BAR * 2,
-            max_subdivision=2,
+            max_subdivision=4,  # Allow 16th notes for fast DnB hats
             is_drum=True,
             drum_sound="hh",
-            rhythm_fitness_fn=lofi_hihat,
+            rhythm_fitness_fn=hihat,
             layer_role="drums",
             context_group="",
             gain=0.15,
             lpf=6000,
-            bank="RolandTR808",
+            bank="korgddm110",
         )
     )
 
@@ -487,12 +526,13 @@ def main():
 
     # Lofi structure with intro buildup and alternating melodies
     song_arrangement = [
-        (2, "stack(intro)"),  # 2 bars - just bass and chords
-        (2, "stack(intro, drums)"),  # 2 bars - add drums
-        (4, "stack(drums, melodic_a)"),  # 4 bars - melody A
-        (4, "stack(drums, melodic_b)"),  # 4 bars - melody B
-        (4, "stack(drums, melodic_a)"),  # 4 bars - back to melody A
-        (2, "stack(intro, drums)"),  # 2 bars - breakdown
+        (2, "stack(drums)"),
+        # (2, "stack(intro)"),  # 2 bars - just bass and chords
+        # (2, "stack(intro, drums)"),  # 2 bars - add drums
+        # (4, "stack(drums, melodic_a)"),  # 4 bars - melody A
+        # (4, "stack(drums, melodic_b)"),  # 4 bars - melody B
+        # (4, "stack(drums, melodic_a)"),  # 4 bars - back to melody A
+        # (2, "stack(intro, drums)"),  # 2 bars - breakdown
     ]
 
     # Use a chill minor scale

@@ -22,6 +22,9 @@ from fitness.chords import (
     resolution_bonus,
     triadic_bonus,
     seventh_chord_bonus,
+    diminished_chord_score,
+    close_voicing_score,
+    chord_progression_similarity,
 )
 
 
@@ -85,6 +88,9 @@ def test_progression(name: str, prog: ChordProgression):
     print(f"    resolution_bonus:   {resolution_bonus(prog):.3f}  (V-I patterns)")
     print(f"    triadic_bonus:      {triadic_bonus(prog):.3f}  (simple triads)")
     print(f"    seventh_chord:      {seventh_chord_bonus(prog):.3f}  (7th chords)")
+    print(f"    diminished_score:   {diminished_chord_score(prog):.3f}  (diminished chords)")
+    print(f"    close_voicing:      {close_voicing_score(prog):.3f}  (adjacent degrees)")
+    print(f"    prog_similarity:    {chord_progression_similarity(prog):.3f}  (chord similarity)")
 
 
 def main():
@@ -178,6 +184,89 @@ def main():
         ]
     )
     test_progression("Isus2 - vi - IV - vi (modal)", modal)
+
+    # === NEW: Test progressions for diminished and similarity ===
+
+    # All diminished chords
+    all_diminished = make_progression(
+        [
+            (0, "diminished"),  # i°
+            (2, "diminished"),  # iii°
+            (4, "diminished"),  # v°
+            (6, "diminished"),  # vii°
+        ]
+    )
+    test_progression("i° - iii° - v° - vii° (all diminished)", all_diminished)
+
+    # Mixed with some diminished
+    mixed_diminished = make_progression(
+        [
+            (0, "major"),       # I
+            (6, "diminished"),  # vii°
+            (0, "major"),       # I
+            (4, "major"),       # V
+        ]
+    )
+    test_progression("I - vii° - I - V (some diminished)", mixed_diminished)
+
+    # Diminished 7th chords
+    dim7_prog = make_progression(
+        [
+            (0, "dim7"),  # i°7
+            (1, "dim7"),  # ii°7
+            (0, "dim7"),  # i°7
+            (4, "dom7"),  # V7
+        ]
+    )
+    test_progression("i°7 - ii°7 - i°7 - V7 (dim7 chords)", dim7_prog)
+
+    # Very similar progression (same chord type, close roots)
+    very_similar = make_progression(
+        [
+            (0, "major"),  # I
+            (0, "major"),  # I
+            (1, "major"),  # II
+            (0, "major"),  # I
+        ]
+    )
+    test_progression("I - I - II - I (very similar)", very_similar)
+
+    # Contrasting progression (different types, distant roots)
+    contrasting = make_progression(
+        [
+            (0, "major"),       # I
+            (4, "minor7"),      # v7
+            (1, "diminished"),  # ii°
+            (6, "dom7"),        # VII7
+        ]
+    )
+    test_progression("I - v7 - ii° - VII7 (contrasting)", contrasting)
+
+    # === Test cases for close_voicing_score ===
+
+    # All minor7 chords - these have adjacent scale degrees!
+    # minor7 = [0, 3, 7, 10] -> degrees [root, root+1, root+3, root+5]
+    all_minor7 = make_progression(
+        [
+            (0, "minor7"),  # degrees: 0, 1, 3, 5
+            (1, "minor7"),  # degrees: 1, 2, 4, 6
+            (4, "minor7"),  # degrees: 4, 5, 0, 2
+            (5, "minor7"),  # degrees: 5, 6, 1, 3
+        ]
+    )
+    test_progression("all minor7 (adjacent degrees)", all_minor7)
+
+    # All major7/dom7 - these DON'T have adjacent degrees
+    # major7 = [0, 4, 7, 11] -> degrees [root, root+2, root+3, root+5]
+    all_major7 = make_progression(
+        [
+            (0, "major7"),  # degrees: 0, 2, 3, 5
+            (3, "major7"),  # degrees: 3, 5, 6, 1
+            (4, "dom7"),    # degrees: 4, 6, 0, 2
+            (0, "major7"),  # degrees: 0, 2, 3, 5
+        ]
+    )
+    test_progression("major7/dom7 (no adjacent)", all_major7)
 
     print_header("CUSTOM CHORD FITNESS EXAMPLE")
     print("\nCombine primitives with weights for custom fitness:")
